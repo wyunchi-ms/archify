@@ -32,6 +32,9 @@ function fixture(t) {
   fs.copyFileSync(path.join(repoRoot, 'scripts/generate-viewer.mjs'), path.join(root, 'scripts/generate-viewer.mjs'));
   const output = path.join(root, 'archify/assets/template.html');
   fs.copyFileSync(path.join(repoRoot, 'archify/assets/template.html'), output);
+  for (const name of ['diagram-set.html', 'diagram-bridge.js']) {
+    fs.copyFileSync(path.join(repoRoot, 'archify/assets', name), path.join(root, 'archify/assets', name));
+  }
   return {
     root, output,
     shell: path.join(root, 'viewer/template.source.html'),
@@ -93,6 +96,32 @@ test('a missing generated template is stale and can be regenerated', (t) => {
   assert.equal(f.run('--check').status, 0);
 });
 
+test('Diagram Set assets are deterministic and every source participates in freshness checks', (t) => {
+  const f = fixture(t);
+  assert.equal(f.run('--check').status, 0);
+  for (const [input, output] of [
+    ['diagram-set.css', 'diagram-set.html'], ['diagram-host.js', 'diagram-set.html'],
+    ['diagram-set.source.html', 'diagram-set.html'], ['diagram-bridge.js', 'diagram-bridge.js'],
+  ]) {
+    const file = path.join(f.root, 'archify/assets', output);
+    const before = fs.readFileSync(file);
+    fs.appendFileSync(path.join(f.root, 'viewer', input), '\n/* source change */\n');
+    assert.equal(f.run('--check').status, 1);
+    assert.deepEqual(fs.readFileSync(file), before);
+    assert.equal(f.run().status, 0);
+    assert.notDeepEqual(fs.readFileSync(file), before);
+  }
+});
+
+test('Malformed set source is rejected before any Viewer artifact is overwritten', (t) => {
+  const f = fixture(t);
+  const before = fs.readFileSync(f.output);
+  fs.appendFileSync(f.camera, '\n/* changed native source */\n');
+  fs.writeFileSync(path.join(f.root, 'viewer/diagram-host.js'), ' ');
+  assert.equal(f.run().status, 1);
+  assert.deepEqual(fs.readFileSync(f.output), before);
+});
+
 test('viewer.css owns the complete main style block', (t) => {
   const f = fixture(t);
   const shell = fs.readFileSync(f.shell, 'utf8');
@@ -124,7 +153,7 @@ for (const [fragment, slot] of Object.entries(fragments)) {
         assert.equal(result.status, 1, failure);
         assert.match(result.stderr, /ENOENT|marker|empty/);
         assert.deepEqual(fs.readFileSync(f.output), previous);
-        assert.deepEqual(fs.readdirSync(path.dirname(f.output)), ['template.html']);
+        assert.deepEqual(fs.readdirSync(path.dirname(f.output)).sort(), ['diagram-bridge.js', 'diagram-set.html', 'template.html']);
       }
     });
   }
@@ -186,7 +215,7 @@ for (const placement of ['additional shell slot', 'moved to shell']) {
       assert.equal(result.status, 1, result.stderr);
       assert.match(result.stderr, /marker/);
       assert.deepEqual(fs.readFileSync(f.output), previous);
-      assert.deepEqual(fs.readdirSync(path.dirname(f.output)), ['template.html']);
+      assert.deepEqual(fs.readdirSync(path.dirname(f.output)).sort(), ['diagram-bridge.js', 'diagram-set.html', 'template.html']);
     }
   });
 }

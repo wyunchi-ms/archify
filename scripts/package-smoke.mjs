@@ -222,6 +222,48 @@ try {
   run(['demo', path.join(scratch, 'demo')]);
   run(['examples']);
 
+  const setInput = path.join(skillRoot, 'examples', 'diagram-set', 'set.json');
+  const setValidation = JSON.parse(run(['validate-set', setInput, '--json']));
+  if (!setValidation.ok || setValidation.diagrams !== 3 || setValidation.relations !== 5
+    || setValidation.sources?.length !== 4 || setValidation.checks?.length !== 3
+    || setValidation.checks.some((check) => !check.ok)) {
+    throw new Error('packaged Diagram Set validation did not verify the complete three-layer fixture');
+  }
+  const setOutput = path.join(scratch, 'diagram-set.html');
+  const setBundle = JSON.parse(run(['bundle', setInput, setOutput, '--json']));
+  if (!setBundle.ok || !setBundle.offline || setBundle.artifact?.bytes !== fs.statSync(setOutput).size
+    || !/^[a-f0-9]{64}$/.test(setBundle.artifact?.sha256 || '')
+    || !fs.readFileSync(setOutput).equals(fs.readFileSync(path.join(skillRoot, 'examples', 'diagram-set', 'output.html')))) {
+    throw new Error('packaged Diagram Set compiler did not reproduce its standalone demo');
+  }
+  const setCache = path.join(scratch, 'set-cache');
+  run(['validate-set', setInput, '--cache-dir', setCache, '--json']);
+  const warmSet = JSON.parse(run(['validate-set', setInput, '--cache-dir', setCache, '--json']));
+  if (warmSet.incremental?.nativeReused?.length !== 3 || warmSet.incremental.nativeRendered.length !== 0) {
+    throw new Error('packaged Diagram Set incremental compilation did not reuse all verified native artifacts');
+  }
+  const typedOutput = path.join(scratch, 'typed-set.html');
+  const typedSet = JSON.parse(run(['bundle', path.join(skillRoot, 'examples', 'diagram-set', 'cross-type.json'), typedOutput, '--json']));
+  if (!typedSet.ok || typedSet.checks.length !== 5 || typedSet.relations !== 4
+    || !fs.readFileSync(typedOutput).equals(fs.readFileSync(path.join(skillRoot, 'examples', 'diagram-set', 'cross-type.html')))) {
+    throw new Error('packaged Diagram Set did not reproduce all five explicitly typed native fixtures');
+  }
+  const typedHtml = fs.readFileSync(typedOutput, 'utf8');
+  const typedData = JSON.parse(typedHtml.match(/<script id="diagram-set-data" type="application\/json">([\s\S]*?)<\/script>/)[1]);
+  if (!Array.isArray(typedData.runtime) || Buffer.byteLength(typedHtml) >= 1.2 * 1024 * 1024
+    || typedData.runtime.filter((resource) => resource.startsWith('<style id="archify-fonts">')).length !== 1
+    || !Object.values(typedData.rendered).every(Array.isArray)) {
+    throw new Error('packaged Diagram Set did not deduplicate its five-scene runtime and fonts');
+  }
+  const canvasOutput = path.join(scratch, 'canvas-set.html');
+  const canvasSet = JSON.parse(run(['bundle', path.join(skillRoot, 'examples', 'diagram-set', 'canvas.json'), canvasOutput, '--json']));
+  const canvasProjection = canvasSet.projections.find((entry) => entry.relation_id === 'frontend_to_backend');
+  if (!canvasSet.ok || canvasSet.diagrams !== 4 || canvasSet.relations !== 6 || canvasSet.checks.length !== 4
+    || canvasProjection?.derived_from?.length !== 4
+    || !fs.readFileSync(canvasOutput).equals(fs.readFileSync(path.join(skillRoot, 'examples', 'diagram-set', 'canvas.html')))) {
+    throw new Error('packaged Diagram Set did not reproduce its in-place many-to-many canvas fixture');
+  }
+
   const fixtures = [
     ['architecture', 'production-deployment.architecture.json'],
     ['workflow', 'agent-tool-call.workflow.json'],

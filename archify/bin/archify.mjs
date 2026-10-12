@@ -2181,6 +2181,8 @@ function usage() {
   archify finalize <type> <input.json> <output.html> [--json] [--receipt path] [--out-dir <dir>] [--quality standard|showcase] [--repo-root path] [--candidate-sha256 hex]
   archify preview <type> <input.json> [output.html] [--no-open] [--quality standard|showcase] [--repo-root path]
   archify validate <type> <input.json> [--json] [--layout-json] [--quality standard|showcase] [--repo-root path]
+  archify validate-set <set.json> [--json] [--quality standard|showcase] [--repo-root path] [--cache-dir path]
+  archify bundle <set.json> <output.html> [--json] [--quality standard|showcase] [--repo-root path] [--cache-dir path]
   archify migrate workflow <old.json> <new.json> --to-schema 2 [--output portable.html] [--json] [--repo-root path]
   archify inspect <type> <input.json>
   archify check <output.html> [--json] [--require-provenance]
@@ -6889,6 +6891,10 @@ try {
       break;
     case 'validate':
       await commandValidate(args);
+      break;
+    case 'validate-set':
+    case 'bundle':
+      (await import('../diagram-set/cli.mjs')).commandDiagramSet(command, args);
       break;
     case 'migrate':
       await commandMigrate(args);

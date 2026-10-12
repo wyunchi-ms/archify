@@ -167,6 +167,25 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
     await snapshot('pointer-cancel');
   });
 
+  await t.test('saved cameras restore through the native state path and invalid input is explicit', async () => {
+    await load();
+    const result = await run(`(() => {
+      const saved={scale:1.5,x:-80,y:-40,mode:'manual'};
+      Archify.view.restore(saved);
+      const state=Archify.view.state();
+      saved.scale=2;
+      const invalid=[null,{scale:0,x:0,y:0,mode:'manual'},{scale:2,x:Infinity,y:0,mode:'manual'}];
+      const errors=invalid.map(value => {
+        try { Archify.view.restore(value); return false; }
+        catch(error) { return error instanceof TypeError; }
+      });
+      return {state,errors,unchanged:JSON.stringify(state)===JSON.stringify(Archify.view.state())};
+    })()`);
+    assert.deepEqual(result.state, { scale: 1.5, x: -80, y: -40, mode: 'manual' });
+    assert.deepEqual(result.errors, [true, true, true]);
+    assert.equal(result.unchanged, true);
+  });
+
   await t.test('target selection, failure branches and instant options preserve their side effects', async () => {
     await load();
     const value = await run(`(async () => {

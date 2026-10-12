@@ -69,11 +69,11 @@ function executable(file) {
 }
 
 function commandPath(command) {
-  const result = spawnSync('sh', ['-c', 'command -v "$1"', 'archify-showcase', command], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore'],
-  });
-  return result.status === 0 ? result.stdout.trim() : null;
+  const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] };
+  const result = process.platform === 'win32'
+    ? spawnSync('where.exe', [command], options)
+    : spawnSync('sh', ['-c', 'command -v "$1"', 'archify-showcase', command], options);
+  return result.status === 0 ? result.stdout.trim().split(/\r?\n/)[0] : null;
 }
 
 function findChrome() {

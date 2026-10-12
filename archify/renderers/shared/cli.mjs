@@ -261,7 +261,6 @@ function stageRenderedHtml(outputPath, html, mode) {
 // Common CLI tail: fill the template and write the standalone HTML file.
 export function writeDiagram({ outPath, template, diagramType, meta, svg, cards, sourceEvidence = null }) {
   if (!START_TYPES.has(diagramType)) throw new Error(`writeDiagram: unknown diagram type ${JSON.stringify(diagramType)}`);
-  const outputGuard = outputPathGuards.get(outPath);
   const html = applyTemplate(template, {
     title: meta.title,
     subtitle: meta.subtitle,
@@ -271,6 +270,11 @@ export function writeDiagram({ outPath, template, diagramType, meta, svg, cards,
     visualPreset: meta.visual_preset || 'classic',
     sourceEvidence,
   });
+  writeStandaloneHtml(outPath, html, { outputGuard: outputPathGuards.get(outPath) });
+  console.log(outPath);
+}
+
+export function writeStandaloneHtml(outPath, html, { outputGuard } = {}) {
   let candidatePath;
   let candidateIdentity;
   let candidateBinding;
@@ -327,7 +331,6 @@ export function writeDiagram({ outPath, template, diagramType, meta, svg, cards,
       }
     }
   }
-  console.log(outPath);
 }
 
 const SEMANTIC_COLLECTIONS = {

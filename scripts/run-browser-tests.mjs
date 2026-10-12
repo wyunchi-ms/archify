@@ -8,6 +8,7 @@ import { findChrome } from '../archify/bin/visual-check.mjs';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'archify');
 // Shared by PR CI and tag releases. WebM decoding stays in test:webm.
 const testFiles = [
+  'diagram-set-browser.test.mjs',
   'finalize-browser.test.mjs',
   'desktop-reader-browser.test.mjs',
   'reader-readability-maintained-browser.test.mjs',

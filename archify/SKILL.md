@@ -69,6 +69,39 @@ Read Mermaid for topology and meaning, then author fresh Archify JSON; do not me
 - `sequenceDiagram` → `sequence`; participants become semantic participants and arrows become messages.
 - `stateDiagram` → `lifecycle`; states and transitions retain meaning, not Mermaid style.
 
+## Hierarchical multi-diagram requests
+
+When the user asks for independent detail diagrams, multi-level drilldown, or
+one coarse edge expanding into several confirmed connections, read
+[Diagram Sets](references/diagram-sets.md) and
+`schemas/diagram-set.schema.json`. Do not treat a Boundary or retired guided view
+as a detail diagram.
+
+Inventory entity IDs, hierarchy entrances and directed relation facts first;
+then author each native diagram's layout. Use evidence from the request/code,
+or label an explicit assumption; otherwise retain `unresolved`/`partial` detail.
+Never invent an internal endpoint to satisfy a parent edge. Architecture
+relations can fold/expand. Other types require per-fact, directed
+`semantic_mappings` to authored native edge IDs with the matching type semantics
+and an explanation; without these, keep navigation-only. Never equate sequence
+message ordering, workflow control or lifecycle transitions with static calls.
+
+Run `node bin/archify.mjs validate-set <set.json> --json`, repair its actionable
+diagnostics, then `node bin/archify.mjs bundle <set.json> <output.html> --json`.
+Both commands check every native artifact; non-zero is not a delivery.
+For Diagram Sets this explicit bundle path replaces the single-diagram
+`finalize` handoff above and produces one offline HTML. Report unresolved
+warnings and distinguish compilation from browser/perceptual review.
+Use `--cache-dir <private-directory>` for repeated compilation when requested;
+report reused/rerendered diagrams from `incremental`, not assumed speedups.
+Repository-evidence validation bypasses native cache reuse.
+The packaged `examples/diagram-set/canvas.json` demonstrates in-place expansion
+on one pannable canvas: open one endpoint for one-to-many, then both endpoints
+for many-to-many; folding preserves the same four HTTPS fact IDs.
+`examples/diagram-set/set.json`, `examples/diagram-set/many-relations.json`
+and `examples/diagram-set/cross-type.json` show three-layer, larger-bundle and
+explicit five-type authoring shapes, not facts about the user's system.
+
 ## Delivery
 
 Use the `finalize` command above for the first candidate and after a repair.

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": { "title": "Web Frontend Detail", "subtitle": "Two clients share both authentication and order APIs", "output": "frontend.html" },
+  "components": [
+    { "id": "shell", "type": "frontend", "label": "Web Shell", "pos": [50, 60], "size": [190, 80] },
+    { "id": "checkout", "type": "frontend", "label": "Checkout App", "pos": [50, 230], "size": [190, 80] }
+  ],
+  "connections": [],
+  "boundaries": []
+}

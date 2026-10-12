@@ -1353,6 +1353,7 @@
         close: close,
         isOpen: isOpen,
         run: runExport,
+        snapshotSvg: function () { return serializeSvg(1, { figure: true }); },
         shareCard: rasterizeShareCard,
         downloadRouteShareCard: runRouteShareCard,
         downloadReachShareCard: runReachShareCard,

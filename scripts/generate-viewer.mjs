@@ -66,19 +66,40 @@ try {
     // including characters with String.replace semantics.
     generated = parts[0] + reindent(source, indent) + tail;
   }
-  if (args[0] === '--check') {
-    if (!fs.existsSync(output) || fs.readFileSync(output, 'utf8') !== generated) {
-      throw new Error('Viewer template is stale — run npm run generate:viewer from archify/.');
+  let host = fs.readFileSync(path.join(root, 'viewer/diagram-set.source.html'), 'utf8');
+  for (const [marker, file] of [
+    ['/* ARCHIFY:SET_CSS */', 'diagram-set.css'],
+    ['/* ARCHIFY:SET_HOST */', 'diagram-host.js'],
+  ]) {
+    if (host.split(marker).length !== 2) throw new Error(`Diagram Set source must contain exactly one ${marker}.`);
+    const source = fs.readFileSync(path.join(root, 'viewer', file), 'utf8');
+    if (!source.trim() || source.includes('/* ARCHIFY:')) throw new Error(`${file} is empty or contains an unresolved marker.`);
+    host = host.replace(marker, () => source);
+  }
+  const bridge = fs.readFileSync(path.join(root, 'viewer/diagram-bridge.js'), 'utf8');
+  if (!bridge.trim() || bridge.includes('/* ARCHIFY:')) throw new Error('diagram-bridge.js is empty or contains an unresolved marker.');
+  for (const marker of ['/* ARCHIFY:SET_DATA */', '/* ARCHIFY:SET_RELATIONS */']) {
+    if (host.split(marker).length !== 2) throw new Error(`Diagram Set source must contain exactly one ${marker}.`);
+  }
+  for (const [destination, content] of [
+    [output, generated],
+    [path.join(root, 'archify/assets/diagram-set.html'), host],
+    [path.join(root, 'archify/assets/diagram-bridge.js'), bridge],
+  ]) {
+    if (args[0] === '--check') {
+      if (!fs.existsSync(destination) || fs.readFileSync(destination, 'utf8') !== content) {
+        throw new Error(`${path.basename(destination)} is stale — run npm run generate:viewer from archify/.`);
+      }
+    } else {
+      const temporary = `${destination}.${process.pid}.tmp`;
+      try {
+        fs.writeFileSync(temporary, content);
+        fs.renameSync(temporary, destination);
+      } finally {
+        fs.rmSync(temporary, { force: true });
+      }
+      console.log(`generated archify/assets/${path.basename(destination)}`);
     }
-  } else {
-    const temporary = `${output}.${process.pid}.tmp`;
-    try {
-      fs.writeFileSync(temporary, generated);
-      fs.renameSync(temporary, output);
-    } finally {
-      fs.rmSync(temporary, { force: true });
-    }
-    console.log('generated archify/assets/template.html');
   }
 } catch (error) {
   console.error(error.message);

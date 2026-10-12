@@ -19,6 +19,12 @@
         clone.removeAttribute('data-route-journey');
         clone.removeAttribute('data-share-route');
         clone.removeAttribute('data-share-reach');
+        Array.prototype.forEach.call(clone.querySelectorAll('[data-drilldown-badge]'), function (el) {
+          el.remove();
+        });
+        Array.prototype.forEach.call(clone.querySelectorAll('[data-drilldown]'), function (el) {
+          el.removeAttribute('data-drilldown');
+        });
         Array.prototype.forEach.call(clone.querySelectorAll('[data-intent-trace-overlay]'), function (el) {
           el.remove();
         });

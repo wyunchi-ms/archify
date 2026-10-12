@@ -512,6 +512,17 @@
         centerAt: centerAt,
         logicalViewport: logicalViewport,
         sync: syncSemantic,
+        restore: function (saved) {
+          if (!saved || ![saved.scale, saved.x, saved.y].every(Number.isFinite) ||
+              saved.scale < 1 || saved.scale > 3 ||
+              ['overview', 'semantic', 'manual'].indexOf(saved.mode) < 0) {
+            throw new TypeError('Invalid saved Viewer camera state.');
+          }
+          stopCameraMotion('restore', false);
+          state = { scale: saved.scale, x: saved.x, y: saved.y, mode: saved.mode };
+          apply();
+          return true;
+        },
         state: function () { return { scale: state.scale, x: state.x, y: state.y, mode: state.mode }; }
       };
     })();

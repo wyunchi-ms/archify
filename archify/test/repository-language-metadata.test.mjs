@@ -18,7 +18,11 @@ function linguistGenerated(relativePath) {
 test('repository language metadata separates generated artifacts from implementation source', () => {
   for (const generatedPath of [
     'archify/assets/template.html',
+    'archify/assets/diagram-set.html',
+    'archify/assets/diagram-bridge.js',
     'archify/examples/web-app-rendered.html',
+    'archify/examples/diagram-set/output.html',
+    'examples/diagram-set/output.html',
     'examples/web-app.html',
     'docs/cases/mco-runtime.architecture.html',
     'docs/gallery.html',
@@ -38,6 +42,9 @@ test('repository language metadata separates generated artifacts from implementa
 
   for (const sourcePath of [
     'viewer/template.source.html',
+    'viewer/diagram-set.source.html',
+    'viewer/diagram-host.js',
+    'viewer/diagram-bridge.js',
     'viewer/reader-layout.js',
     'viewer/viewer-chrome-layout.js',
     'viewer/viewer-camera.js',

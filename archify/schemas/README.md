@@ -12,7 +12,14 @@ against one of the schemas in this folder before any layout work happens.
 | `dataflow.schema.json` | `diagram_type: "dataflow"` | `stages`, `nodes`, `flows` |
 | `lifecycle.schema.json` | `diagram_type: "lifecycle"` | `lanes`, `states`, `transitions` |
 | `architecture.schema.json` | `diagram_type: "architecture"` | `components`, `boundaries`, `connections` |
+| `diagram-set.schema.json` | `kind: "archify-diagram-set"` | `diagrams`, `drilldowns`, `relations`, `projections`, `interfaces` |
 | `common.schema.json` | shared `$defs` only (no top-level document) | — |
+
+Diagram Sets wrap independently valid native diagrams without changing their
+schemas. Use `validate-set` / `bundle`, not a native type renderer, on the
+manifest. See [Diagram Sets](../references/diagram-sets.md) for safe relative
+sources, unique-parent navigation, canonical relation facts, projections,
+unresolved states, ports, adapter capabilities and offline delivery.
 
 Every diagram schema requires `schema_version`, `diagram_type`, `meta` (with
 `title` and a durable portable `output`), and its structural arrays — except `segments`, `activations`, and

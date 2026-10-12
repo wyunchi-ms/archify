@@ -5804,6 +5804,12 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         clone.removeAttribute('data-route-journey');
         clone.removeAttribute('data-share-route');
         clone.removeAttribute('data-share-reach');
+        Array.prototype.forEach.call(clone.querySelectorAll('[data-drilldown-badge]'), function (el) {
+          el.remove();
+        });
+        Array.prototype.forEach.call(clone.querySelectorAll('[data-drilldown]'), function (el) {
+          el.removeAttribute('data-drilldown');
+        });
         Array.prototype.forEach.call(clone.querySelectorAll('[data-intent-trace-overlay]'), function (el) {
           el.remove();
         });
@@ -7239,6 +7245,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         close: close,
         isOpen: isOpen,
         run: runExport,
+        snapshotSvg: function () { return serializeSvg(1, { figure: true }); },
         shareCard: rasterizeShareCard,
         downloadRouteShareCard: runRouteShareCard,
         downloadReachShareCard: runReachShareCard,
@@ -10772,6 +10779,17 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         centerAt: centerAt,
         logicalViewport: logicalViewport,
         sync: syncSemantic,
+        restore: function (saved) {
+          if (!saved || ![saved.scale, saved.x, saved.y].every(Number.isFinite) ||
+              saved.scale < 1 || saved.scale > 3 ||
+              ['overview', 'semantic', 'manual'].indexOf(saved.mode) < 0) {
+            throw new TypeError('Invalid saved Viewer camera state.');
+          }
+          stopCameraMotion('restore', false);
+          state = { scale: saved.scale, x: saved.x, y: saved.y, mode: saved.mode };
+          apply();
+          return true;
+        },
         state: function () { return { scale: state.scale, x: state.x, y: state.y, mode: state.mode }; }
       };
     })();

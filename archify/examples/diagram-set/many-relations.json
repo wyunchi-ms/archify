@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "kind": "archify-diagram-set",
+  "id": "service-platform-dense",
+  "title": "Service Platform / Relation Bundles",
+  "root_diagram": "system",
+  "diagrams": [
+    { "id": "system", "type": "architecture", "source": "system.json" },
+    { "id": "backend", "type": "architecture", "source": "backend.json" },
+    { "id": "auth", "type": "architecture", "source": "auth.json" }
+  ],
+  "drilldowns": [
+    { "from": { "diagram": "system", "node": "backend" }, "to_diagram": "backend" },
+    { "from": { "diagram": "backend", "node": "gateway" }, "to_diagram": "auth" }
+  ],
+  "relations": [
+    { "id": "login", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "auth", "node": "verifier" }, "kind": "http", "label": "POST /login", "evidence": { "mode": "authored" } },
+    { "id": "orders-list", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "orders" }, "kind": "http", "label": "GET /orders", "evidence": { "mode": "authored" } },
+    { "id": "orders-create", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "orders" }, "kind": "http", "label": "POST /orders", "evidence": { "mode": "authored" } },
+    { "id": "orders-update", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "orders" }, "kind": "http", "label": "PATCH /orders", "evidence": { "mode": "authored" } },
+    { "id": "orders-delete", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "orders" }, "kind": "http", "label": "DELETE /orders", "evidence": { "mode": "authored" } },
+    { "id": "upload-create", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "upload" }, "kind": "http", "label": "POST /upload", "evidence": { "mode": "authored" } },
+    { "id": "upload-status", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "upload" }, "kind": "http", "label": "GET /upload/status", "evidence": { "mode": "authored" } },
+    { "id": "upload-cancel", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "upload" }, "kind": "http", "label": "DELETE /upload", "evidence": { "mode": "authored" } },
+    { "id": "orders-history", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "orders" }, "kind": "http", "label": "GET /orders/history", "evidence": { "mode": "authored" } },
+    { "id": "orders-retry", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "orders" }, "kind": "http", "label": "POST /orders/retry", "evidence": { "mode": "authored" } },
+    { "id": "orders-export", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "orders" }, "kind": "http", "label": "GET /orders/export", "evidence": { "mode": "authored" } },
+    { "id": "upload-finish", "from": { "diagram": "system", "node": "frontend" }, "to": { "diagram": "backend", "node": "upload" }, "kind": "http", "label": "POST /upload/finish", "evidence": { "mode": "authored" } }
+  ],
+  "projections": [
+    { "diagram": "system", "relation_id": "frontend_to_backend", "projectionPolicy": "derived", "kind": "http" },
+    { "diagram": "system", "relation_id": "backend_to_database", "status": "unresolved" },
+    { "diagram": "backend", "relation_id": "authenticated_orders", "status": "unresolved" }
+  ],
+  "viewer": { "initial_relation_mode": "bundled", "bundle_threshold": 5 }
+}

@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const schemasDir = path.join(root, 'schemas');
 const output = path.join(root, 'renderers/shared/generated-validators.mjs');
-const diagramTypes = ['workflow', 'sequence', 'dataflow', 'lifecycle', 'architecture'];
+const diagramTypes = ['workflow', 'sequence', 'dataflow', 'lifecycle', 'architecture', 'diagramSet'];
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -21,7 +21,8 @@ ajv.addSchema(JSON.parse(fs.readFileSync(path.join(schemasDir, 'common.schema.js
 
 const schemaIds = {};
 for (const type of diagramTypes) {
-  const schema = JSON.parse(fs.readFileSync(path.join(schemasDir, `${type}.schema.json`), 'utf8'));
+  const name = type === 'diagramSet' ? 'diagram-set' : type;
+  const schema = JSON.parse(fs.readFileSync(path.join(schemasDir, `${name}.schema.json`), 'utf8'));
   ajv.addSchema(schema);
   schemaIds[type] = schema.$id;
 }

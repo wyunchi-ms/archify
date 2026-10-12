@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "kind": "archify-diagram-set",
+  "id": "in-place-service-platform",
+  "title": "Service platform",
+  "root_diagram": "system",
+  "diagrams": [
+    { "id": "system", "type": "architecture", "source": "system.json" },
+    { "id": "frontend", "type": "architecture", "source": "frontend.json" },
+    { "id": "backend", "type": "architecture", "source": "backend.json" },
+    { "id": "auth", "type": "architecture", "source": "auth.json" }
+  ],
+  "drilldowns": [
+    { "from": { "diagram": "system", "node": "frontend" }, "to_diagram": "frontend" },
+    { "from": { "diagram": "system", "node": "backend" }, "to_diagram": "backend" },
+    { "from": { "diagram": "backend", "node": "gateway" }, "to_diagram": "auth" }
+  ],
+  "relations": [
+    { "id": "shell-login", "from": { "diagram": "frontend", "node": "shell" }, "to": { "diagram": "auth", "node": "verifier" }, "kind": "http", "protocol": "HTTPS", "scope": "public", "label": "Sign in", "evidence": { "mode": "authored" } },
+    { "id": "shell-orders", "from": { "diagram": "frontend", "node": "shell" }, "to": { "diagram": "backend", "node": "orders" }, "kind": "http", "protocol": "HTTPS", "scope": "public", "label": "List orders", "evidence": { "mode": "authored" } },
+    { "id": "checkout-login", "from": { "diagram": "frontend", "node": "checkout" }, "to": { "diagram": "auth", "node": "verifier" }, "kind": "http", "protocol": "HTTPS", "scope": "public", "label": "Refresh session", "evidence": { "mode": "authored" } },
+    { "id": "checkout-orders", "from": { "diagram": "frontend", "node": "checkout" }, "to": { "diagram": "backend", "node": "orders" }, "kind": "http", "protocol": "HTTPS", "scope": "public", "label": "Submit order", "evidence": { "mode": "authored" } },
+    { "id": "store-result", "from": { "diagram": "backend", "node": "worker" }, "to": { "diagram": "system", "node": "database" }, "kind": "data-flow", "protocol": "SQL", "label": "Persist results", "evidence": { "mode": "authored" } },
+    { "id": "session-orders", "from": { "diagram": "auth", "node": "session" }, "to": { "diagram": "backend", "node": "orders" }, "kind": "http", "label": "Authorized request", "evidence": { "mode": "authored" } }
+  ],
+  "projections": [
+    { "diagram": "system", "relation_id": "frontend_to_backend", "projectionPolicy": "derived", "kind": "http", "protocol": "HTTPS", "scope": "public" },
+    { "diagram": "system", "relation_id": "backend_to_database", "projectionPolicy": "derived", "kind": "data-flow" },
+    { "diagram": "backend", "relation_id": "authenticated_orders", "projectionPolicy": "derived", "kind": "http" }
+  ],
+  "interfaces": [
+    { "diagram": "frontend", "owner": { "diagram": "system", "node": "frontend" }, "ports": [
+      { "id": "client-http", "direction": "out", "kind": "http", "targets": ["shell", "checkout"], "side": "right" }
+    ] },
+    { "diagram": "backend", "owner": { "diagram": "system", "node": "backend" }, "ports": [
+      { "id": "api-http", "direction": "in", "kind": "http", "targets": ["gateway", "orders"], "side": "left" },
+      { "id": "storage", "direction": "out", "kind": "data-flow", "targets": ["worker"], "side": "right" }
+    ] }
+  ],
+  "viewer": { "transition": "frosted-glass", "blur_px": 6, "external_connections": "ports-and-links", "initial_relation_mode": "bundled", "bundle_threshold": 5 }
+}

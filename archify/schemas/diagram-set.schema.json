@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tt-a1i/archify/schemas/diagram-set.schema.json",
+  "title": "Archify Diagram Set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "id", "root_diagram", "diagrams"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "archify-diagram-set" },
+    "id": { "$ref": "#/$defs/id" },
+    "title": { "$ref": "#/$defs/text" },
+    "locale": { "enum": ["en", "zh-CN"] },
+    "root_diagram": { "$ref": "#/$defs/id" },
+    "diagrams": {
+      "type": "array", "minItems": 1, "maxItems": 32,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "type", "source"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "type": { "enum": ["architecture", "workflow", "sequence", "dataflow", "lifecycle"] },
+          "source": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "title": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "drilldowns": {
+      "type": "array", "maxItems": 31,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["from", "to_diagram"],
+        "properties": {
+          "from": { "$ref": "#/$defs/nodeRef" },
+          "to_diagram": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "relations": {
+      "type": "array", "maxItems": 5000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "from", "to", "kind", "evidence"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "from": { "$ref": "#/$defs/nodeRef" },
+          "to": { "$ref": "#/$defs/nodeRef" },
+          "kind": { "$ref": "#/$defs/id" },
+          "protocol": { "$ref": "#/$defs/text" },
+          "label": { "$ref": "#/$defs/text" },
+          "scope": { "$ref": "#/$defs/id" },
+          "direction": { "const": "directed" },
+          "evidence": {
+            "type": "object", "additionalProperties": false,
+            "required": ["mode"],
+            "properties": {
+              "mode": { "enum": ["authored", "verified-source", "assumption"] },
+              "references": {
+                "type": "array", "minItems": 1, "maxItems": 32,
+                "items": { "$ref": "#/$defs/text" }
+              }
+            },
+            "allOf": [{
+              "if": { "properties": { "mode": { "const": "verified-source" } } },
+              "then": { "properties": { "references": {} }, "required": ["references"] }
+            }]
+          }
+        }
+      }
+    },
+    "projections": {
+      "type": "array", "maxItems": 5000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["diagram", "relation_id"],
+        "properties": {
+          "diagram": { "$ref": "#/$defs/id" },
+          "relation_id": { "$ref": "#/$defs/id" },
+          "derived_from": {
+            "type": "array", "maxItems": 5000, "uniqueItems": true,
+            "items": { "type": "string", "$ref": "#/$defs/id" }
+          },
+          "status": { "enum": ["declared", "resolved", "partial", "unresolved"] },
+          "projectionPolicy": { "enum": ["declared", "derived", "manual"] },
+          "kind": { "$ref": "#/$defs/id" },
+          "protocol": { "$ref": "#/$defs/text" },
+          "scope": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "semantic_mappings": {
+      "type": "array", "maxItems": 10000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["relation_id", "diagram", "edge_id", "semantics", "explanation"],
+        "properties": {
+          "relation_id": { "$ref": "#/$defs/id" },
+          "diagram": { "$ref": "#/$defs/id" },
+          "edge_id": { "$ref": "#/$defs/id" },
+          "semantics": { "enum": ["dependency", "control", "interaction", "data-flow", "transition"] },
+          "explanation": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "interfaces": {
+      "type": "array", "maxItems": 31,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["diagram", "owner", "ports"],
+        "properties": {
+          "diagram": { "$ref": "#/$defs/id" },
+          "owner": { "$ref": "#/$defs/nodeRef" },
+          "ports": {
+            "type": "array", "maxItems": 64,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["id", "direction", "kind", "targets", "side"],
+              "properties": {
+                "id": { "$ref": "#/$defs/id" },
+                "direction": { "enum": ["in", "out"] },
+                "kind": { "$ref": "#/$defs/id" },
+                "targets": {
+                  "type": "array", "minItems": 1, "maxItems": 1000, "uniqueItems": true,
+                  "items": { "type": "string", "$ref": "#/$defs/id" }
+                },
+                "side": { "enum": ["left", "right", "top", "bottom"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "viewer": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "transition": { "const": "frosted-glass", "description": "Legacy foreground-panel setting retained for input compatibility; the canvas uses shared-camera transitions without frosting." },
+        "blur_px": { "type": "number", "minimum": 0, "maximum": 12, "description": "Legacy setting retained for input compatibility; canvas scenes remain sharp and fully opaque." },
+        "external_connections": { "const": "ports-and-links" },
+        "initial_relation_mode": { "enum": ["bundled", "expanded"] },
+        "bundle_threshold": { "type": "integer", "minimum": 1, "maximum": 50 }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_-]*$", "maxLength": 128 },
+    "text": { "type": "string", "minLength": 1, "maxLength": 400 },
+    "nodeRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["diagram", "node"],
+      "properties": {
+        "diagram": { "$ref": "#/$defs/id" },
+        "node": { "$ref": "#/$defs/id" }
+      }
+    }
+  }
+}

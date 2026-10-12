@@ -1,7 +1,9 @@
 # Generated diagram artifacts and built documentation surfaces.
 # Keep source templates and the hand-authored landing page visible to Linguist.
 /archify/examples/*.html linguist-generated=true
+/archify/examples/diagram-set/*.html linguist-generated=true
 /examples/*.html linguist-generated=true
+/examples/diagram-set/*.html linguist-generated=true
 /docs/cases/*.html linguist-generated=true
 /docs/cases/life/*.html linguist-generated=true
 /docs/gallery.html linguist-generated=true
@@ -12,6 +14,8 @@
 
 # Deterministic build outputs committed for zero-install and release verification.
 /archify/assets/template.html linguist-generated=true
+/archify/assets/diagram-set.html linguist-generated=true
+/archify/assets/diagram-bridge.js linguist-generated=true
 /archify/renderers/shared/generated-brand-marks.mjs linguist-generated=true
 /archify/renderers/shared/generated-validators.mjs linguist-generated=true
 

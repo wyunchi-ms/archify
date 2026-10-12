@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": { "title": "Backend Detail", "subtitle": "Explicit external relations / Gateway opens authentication", "output": "backend.html" },
+  "components": [
+    { "id": "gateway", "type": "security", "label": "API Gateway", "sublabel": "Authentication detail +", "pos": [130, 80], "size": [180, 70] },
+    { "id": "orders", "type": "backend", "label": "Orders API", "pos": [130, 280], "size": [180, 70] },
+    { "id": "upload", "type": "backend", "label": "Upload Handler", "pos": [440, 80], "size": [180, 70] },
+    { "id": "queue", "type": "messagebus", "label": "Job Queue", "pos": [440, 280], "size": [180, 70] },
+    { "id": "worker", "type": "backend", "label": "Worker", "pos": [750, 280], "size": [180, 70] }
+  ],
+  "connections": [
+    { "id": "authenticated_orders", "from": "gateway", "to": "orders", "label": "authorized request", "fromSide": "bottom", "toSide": "top", "labelDy": 55 },
+    { "id": "orders_jobs", "from": "orders", "to": "queue", "label": "enqueue" },
+    { "id": "upload_jobs", "from": "upload", "to": "queue", "label": "upload event", "fromSide": "bottom", "toSide": "top", "labelDy": 55 },
+    { "id": "queue_worker", "from": "queue", "to": "worker", "label": "consume" }
+  ],
+  "boundaries": []
+}

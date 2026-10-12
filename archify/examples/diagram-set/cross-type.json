@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "kind": "archify-diagram-set",
+  "id": "explicit-typed-details",
+  "title": "Explicit typed semantic drilldowns",
+  "root_diagram": "system",
+  "diagrams": [
+    {
+      "id": "system",
+      "type": "architecture",
+      "source": "system.json"
+    },
+    {
+      "id": "dataflow",
+      "type": "dataflow",
+      "source": "typed-dataflow.json"
+    },
+    {
+      "id": "workflow",
+      "type": "workflow",
+      "source": "typed-workflow.json"
+    },
+    {
+      "id": "sequence",
+      "type": "sequence",
+      "source": "typed-sequence.json"
+    },
+    {
+      "id": "lifecycle",
+      "type": "lifecycle",
+      "source": "typed-lifecycle.json"
+    }
+  ],
+  "drilldowns": [
+    {
+      "from": {
+        "diagram": "system",
+        "node": "backend"
+      },
+      "to_diagram": "dataflow"
+    },
+    {
+      "from": {
+        "diagram": "dataflow",
+        "node": "web"
+      },
+      "to_diagram": "workflow"
+    },
+    {
+      "from": {
+        "diagram": "workflow",
+        "node": "user"
+      },
+      "to_diagram": "sequence"
+    },
+    {
+      "from": {
+        "diagram": "sequence",
+        "node": "user"
+      },
+      "to_diagram": "lifecycle"
+    }
+  ],
+  "relations": [
+    {
+      "id": "typed-dataflow",
+      "from": {
+        "diagram": "system",
+        "node": "frontend"
+      },
+      "to": {
+        "diagram": "dataflow",
+        "node": "edge"
+      },
+      "kind": "data-flow",
+      "evidence": {
+        "mode": "authored"
+      }
+    },
+    {
+      "id": "typed-workflow",
+      "from": {
+        "diagram": "system",
+        "node": "frontend"
+      },
+      "to": {
+        "diagram": "workflow",
+        "node": "chat"
+      },
+      "kind": "control",
+      "evidence": {
+        "mode": "authored"
+      }
+    },
+    {
+      "id": "typed-sequence",
+      "from": {
+        "diagram": "system",
+        "node": "frontend"
+      },
+      "to": {
+        "diagram": "sequence",
+        "node": "web"
+      },
+      "kind": "interaction",
+      "evidence": {
+        "mode": "authored"
+      }
+    },
+    {
+      "id": "typed-lifecycle",
+      "from": {
+        "diagram": "system",
+        "node": "frontend"
+      },
+      "to": {
+        "diagram": "lifecycle",
+        "node": "approval"
+      },
+      "kind": "transition",
+      "evidence": {
+        "mode": "authored"
+      }
+    }
+  ],
+  "semantic_mappings": [
+    {
+      "relation_id": "typed-dataflow",
+      "diagram": "dataflow",
+      "edge_id": "web-clickstream",
+      "semantics": "data-flow",
+      "explanation": "Fictional authored boundary correspondence: the external Frontend supplies this data-flow input. Native edge order and semantics stay unchanged; no static-call equivalence is inferred."
+    },
+    {
+      "relation_id": "typed-workflow",
+      "diagram": "workflow",
+      "edge_id": "request-chat",
+      "semantics": "control",
+      "explanation": "Fictional authored boundary correspondence: the external Frontend supplies this control input. Native edge order and semantics stay unchanged; no static-call equivalence is inferred."
+    },
+    {
+      "relation_id": "typed-sequence",
+      "diagram": "sequence",
+      "edge_id": "open-page",
+      "semantics": "interaction",
+      "explanation": "Fictional authored boundary correspondence: the external Frontend supplies this interaction input. Native edge order and semantics stay unchanged; no static-call equivalence is inferred."
+    },
+    {
+      "relation_id": "typed-lifecycle",
+      "diagram": "lifecycle",
+      "edge_id": "approval-needed",
+      "semantics": "transition",
+      "explanation": "Fictional authored boundary correspondence: the external Frontend supplies this transition input. Native edge order and semantics stay unchanged; no static-call equivalence is inferred."
+    }
+  ]
+}

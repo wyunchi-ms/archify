@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An offline, explorable architecture canvas with in-place diagram expansion.">
+  <title>Archify Canvas</title>
+  <style>/* ARCHIFY:SET_CSS */</style>
+</head>
+<body>
+  <main id="workspace">
+    <section id="stage" tabindex="0" aria-label="Architecture canvas">
+      <div id="world"><div id="layers"></div></div>
+      <svg id="bridges" xmlns="http://www.w3.org/2000/svg" aria-label="Visible relationships"></svg>
+      <div id="node-targets"></div>
+      <div id="anchors"></div>
+      <header class="canvas-heading">
+        <h1 id="set-title"></h1>
+        <nav id="breadcrumbs" aria-label="Focused hierarchy"></nav>
+      </header>
+      <button id="relations-toggle" class="inspector-toggle" type="button" aria-expanded="false" aria-controls="relations-panel"></button>
+      <nav class="camera-controls" aria-label="Canvas camera">
+        <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+        <output id="zoom-level"></output>
+        <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+        <button id="fit" type="button"></button>
+      </nav>
+      <p id="canvas-hint"></p>
+      <p id="set-status" role="status" aria-live="polite" hidden></p>
+    </section>
+    <aside id="relations-panel" hidden aria-label="Relationship hierarchy">
+      <header class="inspector-heading"><h2 id="relations-heading"></h2><button id="relations-close" type="button" aria-label="Close relationships">×</button></header>
+      <p id="relation-summary"></p>
+      <label class="sr-only" for="global-search" id="search-label"></label>
+      <input id="global-search" type="search" autocomplete="off">
+      <details id="relation-filters">
+        <summary id="filters-label"></summary>
+        <label for="relation-kind" id="kind-label"></label><select id="relation-kind"></select>
+        <label for="relation-protocol" id="protocol-label"></label><select id="relation-protocol"></select>
+        <label for="relation-scope" id="scope-label"></label><select id="relation-scope"></select>
+        <label for="relation-direction" id="direction-label"></label><select id="relation-direction"></select>
+      </details>
+      <div id="search-results"></div>
+      <div id="relation-list"></div>
+    </aside>
+  </main>
+  <script id="diagram-set-data" type="application/json">/* ARCHIFY:SET_DATA */</script>
+  <script>
+  (function () {
+    'use strict';
+/* ARCHIFY:SET_RELATIONS */
+/* ARCHIFY:SET_HOST */
+  })();
+  </script>
+</body>
+</html>

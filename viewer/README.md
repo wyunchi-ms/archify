@@ -30,6 +30,46 @@ initialization order.
 Generated output is not a second editing
 surface; release identity changes also belong in `template.source.html`.
 
+## Diagram Set runtime
+
+`diagram-set.source.html`, `diagram-set.css` and `diagram-host.js` own the
+opt-in infinite-canvas Host. `diagram-bridge.js` is injected only into compiled set
+scenes. `generate:viewer` also emits `archify/assets/diagram-set.html` and
+`archify/assets/diagram-bridge.js`; `check:viewer` checks all three assets.
+Ordinary single-diagram pages do not load the Host or bridge.
+
+The packaged `diagram-set/relations.mjs` is the shared directed projection
+implementation for validation and the Host. The compiler inlines its
+dependency-free definitions; it does not implement a second browser algorithm.
+The Host uses `projectCanvasRelations` over the complete open-entrance forest,
+not the legacy single-path projection used by native-edge validation.
+One shared camera transforms all lazily mounted native scenes. Child content
+fits its original owner rectangle in world space; the camera magnifies that
+ratio instead of opening an unrelated panel. Relations dock outside the stage.
+All scenes stay sharp and fully opaque, including composed exports. Entrance
+badges wait for fonts and native layout to settle; targets and bridge endpoints
+use the native card mask rather than decorative SVG group bounds.
+Canvas-only chrome/visibility overrides live in the Bridge, never in the
+ordinary single-diagram template. Loading frames temporarily counter the
+camera so offscreen iframe rAF throttling cannot block native initialization;
+their DOM parent stays unchanged to avoid document reloads.
+The compiler pools byte-identical complete native script/style blocks once per
+bundle, including fonts, translations and the Bridge. Diagram markup stores
+ordered references; the Host reconstructs the exact native document only when
+mounting a scene, then injects its private reply credential without mutating the
+pool. Script order, classic scope, stylesheet/font element IDs and native export
+introspection stay unchanged. This is offline payload sharing, not shared DOM
+or JavaScript state between opaque-origin iframes.
+See [Diagram Sets](../archify/references/diagram-sets.md) for the manifest,
+protocol boundary, export scope and supported adapter matrix.
+
+`Archify.view.restore(saved)` validates finite, bounded camera state, cancels
+in-flight camera work and reapplies it through the existing clamp/controls
+path. `Archify.exportMenu.snapshotSvg()` returns the existing canonical
+figure SVG serialization without downloading or mutating the live SVG.
+The opt-in bridge uses these seams for state virtualization and combined PNG;
+ordinary camera/export call behavior is unchanged.
+
 ## Export contract
 
 `export.js` contains the complete Export heading and IIFE. It initializes once
@@ -43,9 +83,10 @@ loader or a second runtime initialization step.
 
 ### Interface and dependencies
 
-The interface includes all nine `Archify.exportMenu` methods: open, close, isOpen,
+The interface includes all ten `Archify.exportMenu` methods: open, close, isOpen,
 run, shareCard, downloadRouteShareCard, downloadReachShareCard, syncRouteShare,
-and syncReachShare. The same closure installs
+syncReachShare and snapshotSvg. The last method returns a canonical serialized
+SVG and its dimensions without downloading. The same closure installs
 `Archify.motion.canRecord` and `recordWebm`; this recording capability is distinct
 from Motion Governor. Return values and synchronous/asynchronous failure modes
 are part of the interface, not normalized by the extraction.

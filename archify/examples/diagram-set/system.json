@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": { "title": "Service Platform", "subtitle": "System context / double-click Backend", "output": "system.html" },
+  "components": [
+    { "id": "frontend", "type": "frontend", "label": "Web Frontend", "pos": [60, 180], "size": [150, 70] },
+    { "id": "backend", "type": "backend", "label": "Backend", "sublabel": "Gateway / Orders / Upload", "pos": [390, 180], "size": [180, 70] },
+    { "id": "database", "type": "database", "label": "Database", "pos": [760, 180], "size": [150, 70] }
+  ],
+  "connections": [
+    { "id": "frontend_to_backend", "from": "frontend", "to": "backend", "label": "HTTP / Events", "variant": "emphasis" },
+    { "id": "backend_to_database", "from": "backend", "to": "database", "label": "SQL" }
+  ],
+  "boundaries": []
+}
