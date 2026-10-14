@@ -11,3 +11,31 @@ Install, update, reinstall, or remove a live Archify installation only when the 
 - Use the canonical remote source by default. Use a local source only when requested, from a durable checkout; live symlinks must not point into temporary directories or disposable worktrees.
 - Preserve unrelated files and existing unmanaged destinations. Report a destination conflict before replacing it unless that exact replacement is already explicitly authorized; use the installer's documented conflict handling within the approved scope.
 - Report the action, source, targets, and result, including skipped or failed destinations. A partial installation is not a complete success.
+
+### Authorized development Skill synchronization
+
+The current checkout's user has explicitly authorized keeping their user-level
+GitHub Copilot `archify` Skill synchronized after feature updates on
+`wyunchi/drill-down`. This is a scoped exception to the explicit-action rule
+above, not authorization to change other users' installations.
+
+- After the feature changes and relevant validation are complete, synchronize
+  only `archify` from this durable checkout to the current user's existing
+  GitHub Copilot global installation. Use Skills CLI copy mode; do not install
+  other agents, update Pi/DSH packages, or use the canonical remote instead.
+- Before each sync, repeat source discovery and check that
+  `.archify-development-install.json` in the installed Skill still points to
+  this checkout. Skills CLI does not record this local global source in its
+  remote-update lock. If the branch, source, agent, scope,
+  or destination ownership differs, report the mismatch rather than replacing
+  another installation. If the installation has been removed, do not recreate
+  it automatically.
+- The scoped command is `npx -y skills add . --skill archify --agent github-copilot --global --copy --yes`.
+  If registry resolution fails, use the repository's available pinned Skills
+  CLI version after successful discovery; do not change global npm settings.
+- Verify installed Skill/runtime files and a CLI smoke check after copying,
+  then refresh that installation receipt with the source revision and report
+  the synchronization result separately from commit/push. Use the installer's
+  actual destination (currently the shared user directory `.agents\skills\archify`),
+  not an assumed `.copilot\skills` path.
+  This instruction does not authorize a background watcher or Git hook.
