@@ -1,0 +1,535 @@
+{
+  "schema_version": 1,
+  "kind": "archify-diagram-set",
+  "id": "archify-repository-pipeline",
+  "title": "Archify: code-backed hierarchical compilation",
+  "repository_url": "https://github.com/wyunchi-ms/archify",
+  "root_diagram": "root",
+  "diagrams": [
+    {
+      "id": "root",
+      "type": "architecture",
+      "source": "root.json"
+    },
+    {
+      "id": "commands",
+      "type": "architecture",
+      "source": "commands.json"
+    },
+    {
+      "id": "engine",
+      "type": "architecture",
+      "source": "engine.json"
+    },
+    {
+      "id": "native",
+      "type": "architecture",
+      "source": "native.json"
+    }
+  ],
+  "drilldowns": [
+    {
+      "from": {
+        "diagram": "root",
+        "node": "cli"
+      },
+      "to_diagram": "commands"
+    },
+    {
+      "from": {
+        "diagram": "root",
+        "node": "engine"
+      },
+      "to_diagram": "engine"
+    },
+    {
+      "from": {
+        "diagram": "engine",
+        "node": "renderers"
+      },
+      "to_diagram": "native"
+    }
+  ],
+  "relations": [
+    {
+      "id": "command-bundle",
+      "from": {
+        "diagram": "commands",
+        "node": "handler"
+      },
+      "to": {
+        "diagram": "engine",
+        "node": "bundle"
+      },
+      "kind": "call",
+      "label": "bundleDiagramSet",
+      "protocol": "JavaScript",
+      "scope": "cli",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/cli.mjs",
+            "line": 30,
+            "endLine": 30,
+            "sha256": "073930454bb3ed863d42acc0e49d9c827833197a5ffc194d0a885556f715bb30"
+          }
+        ]
+      }
+    },
+    {
+      "id": "command-validate",
+      "from": {
+        "diagram": "commands",
+        "node": "handler"
+      },
+      "to": {
+        "diagram": "engine",
+        "node": "validate"
+      },
+      "kind": "call",
+      "label": "compileDiagramSet",
+      "protocol": "JavaScript",
+      "scope": "cli",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/cli.mjs",
+            "line": 31,
+            "endLine": 31,
+            "sha256": "073930454bb3ed863d42acc0e49d9c827833197a5ffc194d0a885556f715bb30"
+          }
+        ]
+      }
+    },
+    {
+      "id": "command-diagnostic",
+      "from": {
+        "diagram": "commands",
+        "node": "handler"
+      },
+      "to": {
+        "diagram": "engine",
+        "node": "diagnostics"
+      },
+      "kind": "call",
+      "label": "setDiagnostic on failure",
+      "protocol": "JavaScript",
+      "scope": "cli",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/cli.mjs",
+            "line": 51,
+            "endLine": 51,
+            "sha256": "073930454bb3ed863d42acc0e49d9c827833197a5ffc194d0a885556f715bb30"
+          }
+        ]
+      }
+    },
+    {
+      "id": "bundle-load",
+      "from": {
+        "diagram": "engine",
+        "node": "bundle"
+      },
+      "to": {
+        "diagram": "engine",
+        "node": "loader"
+      },
+      "kind": "call",
+      "label": "Load and validate manifest",
+      "protocol": "JavaScript",
+      "scope": "compiler",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/compiler.mjs",
+            "line": 158,
+            "endLine": 158,
+            "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "validate-load",
+      "from": {
+        "diagram": "engine",
+        "node": "validate"
+      },
+      "to": {
+        "diagram": "engine",
+        "node": "loader"
+      },
+      "kind": "call",
+      "label": "Load and validate manifest",
+      "protocol": "JavaScript",
+      "scope": "compiler",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/compiler.mjs",
+            "line": 51,
+            "endLine": 51,
+            "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "bundle-compile",
+      "from": {
+        "diagram": "engine",
+        "node": "bundle"
+      },
+      "to": {
+        "diagram": "engine",
+        "node": "compile"
+      },
+      "kind": "call",
+      "label": "Compile loaded set",
+      "protocol": "JavaScript",
+      "scope": "compiler",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/compiler.mjs",
+            "line": 169,
+            "endLine": 169,
+            "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "validate-compile",
+      "from": {
+        "diagram": "engine",
+        "node": "validate"
+      },
+      "to": {
+        "diagram": "engine",
+        "node": "compile"
+      },
+      "kind": "call",
+      "label": "Compile loaded set",
+      "protocol": "JavaScript",
+      "scope": "compiler",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/compiler.mjs",
+            "line": 51,
+            "endLine": 51,
+            "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "bundle-html",
+      "from": {
+        "diagram": "engine",
+        "node": "bundle"
+      },
+      "to": {
+        "diagram": "root",
+        "node": "artifact"
+      },
+      "kind": "writes",
+      "label": "Atomic standalone HTML publication",
+      "protocol": "HTML",
+      "scope": "delivery",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/compiler.mjs",
+            "line": 171,
+            "endLine": 171,
+            "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "render-architecture",
+      "from": {
+        "diagram": "engine",
+        "node": "compile"
+      },
+      "to": {
+        "diagram": "native",
+        "node": "architecture"
+      },
+      "kind": "process",
+      "label": "Dispatch architecture renderer",
+      "protocol": "Node.js process",
+      "scope": "compiler",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/compiler.mjs",
+            "line": 105,
+            "endLine": 105,
+            "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+          },
+          {
+            "path": "archify/diagram-set/relations.mjs",
+            "line": 2,
+            "endLine": 2,
+            "sha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d"
+          },
+          {
+            "path": "archify/renderers/architecture/render-architecture.mjs",
+            "line": 53,
+            "endLine": 53,
+            "sha256": "3831899e2e12cedd2e8225285fc9e50e8cd032f036fac87264b0bd5ddc60fda6",
+            "commit": "ae58b77f51f8091fbcaad72f6a6370a889202ac0"
+          }
+        ]
+      }
+    },
+    {
+      "id": "render-workflow",
+      "from": {
+        "diagram": "engine",
+        "node": "compile"
+      },
+      "to": {
+        "diagram": "native",
+        "node": "workflow"
+      },
+      "kind": "process",
+      "label": "Dispatch workflow renderer",
+      "protocol": "Node.js process",
+      "scope": "compiler",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/compiler.mjs",
+            "line": 105,
+            "endLine": 105,
+            "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+          },
+          {
+            "path": "archify/diagram-set/relations.mjs",
+            "line": 3,
+            "endLine": 3,
+            "sha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d"
+          },
+          {
+            "path": "archify/renderers/workflow/render-workflow.mjs",
+            "line": 10,
+            "endLine": 10,
+            "sha256": "df6cb1330231616dcb83592c3cc1dbf4b3e45567779836ae031ff57d2d517b89",
+            "commit": "ae58b77f51f8091fbcaad72f6a6370a889202ac0"
+          }
+        ]
+      }
+    },
+    {
+      "id": "render-sequence",
+      "from": {
+        "diagram": "engine",
+        "node": "compile"
+      },
+      "to": {
+        "diagram": "native",
+        "node": "sequence"
+      },
+      "kind": "process",
+      "label": "Dispatch sequence renderer",
+      "protocol": "Node.js process",
+      "scope": "compiler",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/compiler.mjs",
+            "line": 105,
+            "endLine": 105,
+            "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+          },
+          {
+            "path": "archify/diagram-set/relations.mjs",
+            "line": 4,
+            "endLine": 4,
+            "sha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d"
+          },
+          {
+            "path": "archify/renderers/sequence/render-sequence.mjs",
+            "line": 20,
+            "endLine": 20,
+            "sha256": "46ed05a34655fbe6c421586366aa81480bca893233d61b9391e21afc667f15a1",
+            "commit": "ae58b77f51f8091fbcaad72f6a6370a889202ac0"
+          }
+        ]
+      }
+    },
+    {
+      "id": "render-dataflow",
+      "from": {
+        "diagram": "engine",
+        "node": "compile"
+      },
+      "to": {
+        "diagram": "native",
+        "node": "dataflow"
+      },
+      "kind": "process",
+      "label": "Dispatch dataflow renderer",
+      "protocol": "Node.js process",
+      "scope": "compiler",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/compiler.mjs",
+            "line": 105,
+            "endLine": 105,
+            "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+          },
+          {
+            "path": "archify/diagram-set/relations.mjs",
+            "line": 5,
+            "endLine": 5,
+            "sha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d"
+          },
+          {
+            "path": "archify/renderers/dataflow/render-dataflow.mjs",
+            "line": 49,
+            "endLine": 49,
+            "sha256": "a8540e7b1a4794c6da6b64707ce17e970ca5e876544fd29554d2503c196f1dde",
+            "commit": "ae58b77f51f8091fbcaad72f6a6370a889202ac0"
+          }
+        ]
+      }
+    },
+    {
+      "id": "render-lifecycle",
+      "from": {
+        "diagram": "engine",
+        "node": "compile"
+      },
+      "to": {
+        "diagram": "native",
+        "node": "lifecycle"
+      },
+      "kind": "process",
+      "label": "Dispatch lifecycle renderer",
+      "protocol": "Node.js process",
+      "scope": "compiler",
+      "evidence": {
+        "mode": "verified-source",
+        "sources": [
+          {
+            "path": "archify/diagram-set/compiler.mjs",
+            "line": 105,
+            "endLine": 105,
+            "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+          },
+          {
+            "path": "archify/diagram-set/relations.mjs",
+            "line": 6,
+            "endLine": 6,
+            "sha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d"
+          },
+          {
+            "path": "archify/renderers/lifecycle/render-lifecycle.mjs",
+            "line": 44,
+            "endLine": 44,
+            "sha256": "1ed2e359a5eab6a2bd9473c36c6184498d68748e9175cddf6894aa7b2ba3f670",
+            "commit": "ae58b77f51f8091fbcaad72f6a6370a889202ac0"
+          }
+        ]
+      }
+    }
+  ],
+  "projections": [
+    {
+      "diagram": "root",
+      "relation_id": "dispatch",
+      "projectionPolicy": "derived",
+      "kind": "call",
+      "scope": "cli"
+    },
+    {
+      "diagram": "root",
+      "relation_id": "publication",
+      "projectionPolicy": "derived",
+      "kind": "writes"
+    },
+    {
+      "diagram": "engine",
+      "relation_id": "bundle-load-edge",
+      "projectionPolicy": "derived",
+      "kind": "call"
+    },
+    {
+      "diagram": "engine",
+      "relation_id": "validate-load-edge",
+      "projectionPolicy": "derived",
+      "kind": "call"
+    },
+    {
+      "diagram": "engine",
+      "relation_id": "bundle-compile-edge",
+      "projectionPolicy": "derived",
+      "kind": "call"
+    },
+    {
+      "diagram": "engine",
+      "relation_id": "validate-compile-edge",
+      "projectionPolicy": "derived",
+      "kind": "call"
+    },
+    {
+      "diagram": "engine",
+      "relation_id": "native-dispatch",
+      "projectionPolicy": "derived",
+      "kind": "process"
+    }
+  ],
+  "chains": [
+    {
+      "id": "bundle-architecture",
+      "title": "Bundle an Architecture diagram",
+      "relation_ids": [
+        "command-bundle",
+        "bundle-compile",
+        "render-architecture"
+      ]
+    },
+    {
+      "id": "validate-workflow",
+      "title": "Validate a Workflow diagram",
+      "relation_ids": [
+        "command-validate",
+        "validate-compile",
+        "render-workflow"
+      ]
+    },
+    {
+      "id": "html-delivery",
+      "title": "Publish the offline HTML",
+      "relation_ids": [
+        "command-bundle",
+        "bundle-html"
+      ]
+    }
+  ],
+  "viewer": {
+    "initial_relation_mode": "bundled",
+    "bundle_threshold": 5
+  }
+}

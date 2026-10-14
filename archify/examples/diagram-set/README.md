@@ -43,9 +43,17 @@ For repeated builds, append `--cache-dir <private-empty-directory>` and compare
 the receipt's `incremental` results. Editing one native source rerenders only
 that diagram; source validation and native artifact checks still run.
 
-All facts are fictional, explicitly authored examples. The JSON files are the
+Those four fixtures contain fictional, explicitly authored facts. The JSON files are the
 authoritative inputs. HTML files are generated with the commands above. Each
 native JSON can still be rendered individually.
+
+[`repository/`](repository/README.md) is a separate, real-code fixture of
+Archify's public CLI-to-renderer path. It has three layers, 13 snapshot-backed
+facts, 1-to-3 / 1-to-5 conditional dispatch and named directed chains.
+Its portable HTML reports unverified sources; its audit receipt records the
+generation-time check against this checkout. It is not another root-gallery copy.
+The [authoring recipes](../../references/diagram-set-recipes.md) show repository,
+incremental and N-fact generation without guessing unknown detail.
 
 See [Diagram Sets](../../references/diagram-sets.md) for the schema, source-path
 limits, projection/evidence semantics, export scopes and capability matrix.

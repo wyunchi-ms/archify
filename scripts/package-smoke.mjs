@@ -263,6 +263,17 @@ try {
     || !fs.readFileSync(canvasOutput).equals(fs.readFileSync(path.join(skillRoot, 'examples', 'diagram-set', 'canvas.html')))) {
     throw new Error('packaged Diagram Set did not reproduce its in-place many-to-many canvas fixture');
   }
+  const repositoryOutput = path.join(scratch, 'repository-set.html');
+  const repositorySet = JSON.parse(run(['bundle', path.join(skillRoot, 'examples', 'diagram-set', 'repository', 'set.json'),
+    repositoryOutput, '--json'], { env: { ...process.env, ARCHIFY_REPO_ROOT: '' } }));
+  const repositoryHtml = fs.readFileSync(repositoryOutput, 'utf8');
+  const repositoryData = JSON.parse(repositoryHtml.match(/<script id="diagram-set-data" type="application\/json">([\s\S]*?)<\/script>/)[1]);
+  if (!repositorySet.ok || repositorySet.diagrams !== 4 || repositorySet.relations !== 13
+    || repositoryData.manifest.chains.length !== 3
+    || Object.values(repositoryData.evidence).some((entry) => entry.status !== 'unverified')
+    || !fs.readFileSync(repositoryOutput).equals(fs.readFileSync(path.join(skillRoot, 'examples', 'diagram-set', 'repository', 'output.html')))) {
+    throw new Error('packaged real-code Diagram Set did not reproduce independently of the checkout');
+  }
 
   const fixtures = [
     ['architecture', 'production-deployment.architecture.json'],

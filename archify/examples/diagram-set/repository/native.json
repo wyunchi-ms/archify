@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Existing typed native renderers",
+    "output": "native.html"
+  },
+  "components": [
+    {
+      "id": "architecture",
+      "label": "render-architecture.mjs",
+      "type": "backend",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "workflow",
+      "label": "render-workflow.mjs",
+      "type": "backend",
+      "pos": [
+        440,
+        40
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "sequence",
+      "label": "render-sequence.mjs",
+      "type": "backend",
+      "pos": [
+        840,
+        40
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "dataflow",
+      "label": "render-dataflow.mjs",
+      "type": "backend",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "lifecycle",
+      "label": "render-lifecycle.mjs",
+      "type": "backend",
+      "pos": [
+        440,
+        240
+      ],
+      "size": [
+        220,
+        80
+      ]
+    }
+  ],
+  "connections": [],
+  "boundaries": []
+}

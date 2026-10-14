@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
 import { compileDiagramSet } from '../diagram-set/compiler.mjs';
 import { ChromeVisualBrowser, findChrome } from '../bin/visual-check.mjs';
 
@@ -30,6 +31,23 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
   fs.writeFileSync(path.join(scratch, 'internal.json'), JSON.stringify(internal));
   files.internal = path.join(scratch, 'internal.html');
   fs.writeFileSync(files.internal, compileDiagramSet(path.join(scratch, 'internal.json')).html);
+  const traced = structuredClone(internal);
+  traced.relations.push({ id: 'verify-session', from: { diagram: 'auth', node: 'verifier' },
+    to: { diagram: 'auth', node: 'session' }, kind: 'claims', evidence: { mode: 'authored' } });
+  traced.chains = [{ id: 'login-path', title: 'Verify login and call Orders',
+    relation_ids: ['rel-login', 'verify-session', 'rel-auth-orders'] }];
+  const proof = 'export const login = true;\n';
+  fs.writeFileSync(path.join(scratch, 'proof.mjs'), proof);
+  traced.relations[0].evidence = { mode: 'verified-source', sources: [{ path: 'proof.mjs', line: 1,
+    sha256: createHash('sha256').update(proof).digest('hex') }] };
+  fs.writeFileSync(path.join(scratch, 'traced.json'), JSON.stringify(traced));
+  for (const [name, repoRoot] of [['traced', scratch], ['unverified', undefined]]) {
+    files[name] = path.join(scratch, `${name}.html`);
+    fs.writeFileSync(files[name], compileDiagramSet(path.join(scratch, 'traced.json'), { repoRoot }).html);
+  }
+  fs.writeFileSync(path.join(scratch, 'proof.mjs'), 'changed\n');
+  files.stale = path.join(scratch, 'stale.html');
+  fs.writeFileSync(files.stale, compileDiagramSet(path.join(scratch, 'traced.json'), { repoRoot: scratch }).html);
   const medium = JSON.parse(fs.readFileSync(path.join(fixture, 'set.json'), 'utf8'));
   const metrics = { nodes: 0, nativeEdges: 0, facts: 300 };
   for (const [id, count] of [['system', 40], ['backend', 30], ['auth', 30]]) {
@@ -67,8 +85,11 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
   t.after(() => browser.close());
   const session = await browser.sessionPromise;
   const send = (method, params = {}) => browser.cdp.send(method, params, session);
+  let mainContextId;
+  const frameSessions = new Map(), frameContexts = new Map(), frameErrors = [];
+  await send('Runtime.enable');
   await browser.cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' });
-  await send('Page.addScriptToEvaluateOnNewDocument', { source: `
+  const instrumentation = `
     window.setErrors=[];window.setSnapshots={};
     const createObjectUrl=URL.createObjectURL.bind(URL);
     URL.createObjectURL=blob=>{
@@ -93,16 +114,39 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
         setTimeout(poll,25);
       } poll();
     });
-  ` });
-  async function run(expression, contextId) {
-    const result = await send('Runtime.evaluate', { expression, contextId, returnByValue: true, awaitPromise: true });
+  `;
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: instrumentation });
+  const attachFrame = ({ sessionId, targetInfo }, parentSession) => {
+    if (parentSession !== session || targetInfo.type !== 'iframe') return;
+    const ready = (async () => {
+      await browser.cdp.send('Page.enable', {}, sessionId);
+      await browser.cdp.send('Runtime.enable', {}, sessionId);
+      await browser.cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: instrumentation, runImmediately: true }, sessionId);
+      await browser.cdp.send('Runtime.runIfWaitingForDebugger', {}, sessionId);
+      return sessionId;
+    })();
+    ready.catch(error => frameErrors.push(error));
+    frameSessions.set(targetInfo.targetId, ready);
+  };
+  browser.cdp.events.on('Target.attachedToTarget', attachFrame);
+  t.after(() => browser.cdp.events.off('Target.attachedToTarget', attachFrame));
+  await send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: true, flatten: true,
+    filter: [{ type: 'iframe' }] });
+  async function run(expression, contextId, awaitPromise = false) {
+    assert.ifError(frameErrors[0]);
+    let result;
+    try { result = await browser.cdp.send('Runtime.evaluate', {
+      expression, contextId: contextId?.contextId ?? contextId ?? mainContextId, returnByValue: true, awaitPromise,
+    }, contextId?.sessionId ?? session); }
+    catch (error) { error.message += `\nCanvas expression: ${expression}`; throw error; }
     assert.equal(result.exceptionDetails, undefined, result.exceptionDetails?.exception?.description);
     return result.result?.value;
   }
+  const runAsync = (expression, contextId) => run(expression, contextId, true);
   async function stable(id = 'system', error = false) {
-    await run(`setWait(()=>window.ArchifyDiagramSet?.state().path.at(-1)===${JSON.stringify(id)}
+    await runAsync(`setWait(()=>window.ArchifyDiagramSet?.state().path.at(-1)===${JSON.stringify(id)}
       &&ArchifyDiagramSet.state().ready&&!ArchifyDiagramSet.state().moving&&!ArchifyDiagramSet.state().morphing)`);
-    await run('new Promise(resolve=>setTimeout(resolve,80))');
+    await new Promise(resolve => setTimeout(resolve, 80));
     assert.deepEqual(await run('setErrors'), []);
     assert.equal(await run("document.getElementById('set-status').getAttribute('data-error')"), String(error),
       await run("document.getElementById('set-status').textContent"));
@@ -114,17 +158,28 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
     await send('Page.navigate', { url: 'about:blank' });
     await blank;
     const loaded = browser.cdp.waitFor('Page.loadEventFired', session);
+    const created = browser.cdp.waitFor('Runtime.executionContextCreated', session);
     await send('Page.navigate', { url: pathToFileURL(files[name]).href + hash });
+    mainContextId = (await created).context.id;
     await loaded;
     const params = new URLSearchParams(hash.replace(/^#/, ''));
     const destination = (params.get('path') || 'system').split('/').at(-1);
     await stable(hash === '#path=system%2Fauth' ? 'system' : destination, hash === '#path=system%2Fauth');
   }
   async function context(id) {
-    const tree = await send('Page.getFrameTree');
-    const frame = tree.frameTree.childFrames?.find((entry) => entry.frame.name === id);
-    assert.ok(frame, `iframe ${id} exists`);
-    return (await send('Page.createIsolatedWorld', { frameId: frame.frame.id, worldName: 'archify-canvas-test' })).executionContextId;
+    const document = await send('DOM.getDocument');
+    const { nodeId } = await send('DOM.querySelector', { nodeId: document.root.nodeId,
+      selector: `iframe[data-diagram=${JSON.stringify(id)}]` });
+    assert.ok(nodeId, `iframe ${id} exists`);
+    const { node } = await send('DOM.describeNode', { nodeId });
+    assert.ok(node.frameId, `iframe ${id} has a frame identity`);
+    if (!frameContexts.has(node.frameId)) {
+      const frameSession = await frameSessions.get(node.frameId) || session;
+      const { executionContextId } = await browser.cdp.send('Page.createIsolatedWorld',
+        { frameId: node.frameId, worldName: 'archify-canvas-test' }, frameSession);
+      frameContexts.set(node.frameId, { contextId: executionContextId, sessionId: frameSession });
+    }
+    return frameContexts.get(node.frameId);
   }
   async function expand(diagram, node, child) {
     await run(`ArchifyDiagramSet.expand(${JSON.stringify(diagram)},${JSON.stringify(node)})`);
@@ -144,6 +199,7 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
       return {id:node.getAttribute('data-node-id'),hidden:node.hasAttribute('data-canvas-hidden'),box:box&&{x:box.x,y:box.y,width:box.width,height:box.height}};
     })`, world);
     const view = await run('ArchifyDiagramSet.state()'), layout = view.layouts[id];
+    const viewport = await run("({width:document.getElementById('stage').clientWidth,height:document.getElementById('stage').clientHeight})");
     const targets = await run(`Array.from(document.querySelectorAll('[data-node-ref]')).map(target=>({
       id:target.dataset.nodeRef,x:parseFloat(target.style.left),y:parseFloat(target.style.top),
       width:parseFloat(target.style.width),height:parseFloat(target.style.height)}))`);
@@ -151,13 +207,17 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
       assert.ok(shape.box, `${id}:${shape.id} has an explicit native node shape`);
       const target = targets.find((target) => target.id === `${id}:${shape.id}`);
       if (shape.hidden) { assert.equal(target, undefined); continue; }
-      assert.ok(target, `${id}:${shape.id} has a canvas target`);
       const gain = layout.scale * view.camera.scale;
       const expected = {
         x: view.camera.x + (layout.x + shape.box.x * layout.scale) * view.camera.scale,
         y: view.camera.y + (layout.y + shape.box.y * layout.scale) * view.camera.scale,
         width: shape.box.width * gain, height: shape.box.height * gain,
       };
+      if (expected.x + expected.width < 0 || expected.y + expected.height < 0
+        || expected.x > viewport.width || expected.y > viewport.height) {
+        assert.equal(target, undefined, `${id}:${shape.id} offscreen target is virtualized`); continue;
+      }
+      assert.ok(target, `${id}:${shape.id} has a canvas target`);
       for (const key of ['x', 'y', 'width', 'height']) assert.ok(Math.abs(target[key] - expected[key]) < 1,
         `${id}:${shape.id} target ${key} follows its painted card, not decorative group bounds: ${target[key]} vs ${expected[key]}`);
     }
@@ -438,7 +498,7 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
     })()`;
     const route = await run(native, world);
     for (let i = 0; i < 2; i += 1) {
-      const frames = await run(`new Promise(resolve=>{
+      const frames = await runAsync(`new Promise(resolve=>{
         const samples=[],start=performance.now();
         ArchifyDiagramSet.select('rel-orders');
         function sample(){
@@ -460,6 +520,10 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
     await run("document.getElementById('relations-toggle').click()");
     const bundle = await run("ArchifyDiagramSet.project().find(group=>group.to.node==='orders').key");
     await run(`Array.from(document.querySelectorAll('[data-bundle]')).find(node=>node.dataset.bundle===${JSON.stringify(bundle)}).click()`);
+    await stable('backend');
+    assert.equal(await run("ArchifyDiagramSet.project().find(group=>group.to.node==='orders').count"), 7);
+    // Docking can move the incoming port offscreen; expose it before counting painted detail.
+    await run("ArchifyDiagramSet.pan((1440-document.getElementById('stage').clientWidth)/2,0)");
     await stable('backend');
     assert.equal(await run("document.querySelectorAll('.bridge-line[data-to=\"backend:orders\"]').length"), 7);
   });
@@ -540,7 +604,7 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
         return drawImage.apply(this,args);
       };
     })()`);
-    const receipt = await run('ArchifyDiagramSet.exportComposite()');
+    const receipt = await runAsync('ArchifyDiagramSet.exportComposite()');
     assert.equal(receipt.scope, 'combined'); assert.ok(receipt.bytes > 10000); assert.ok(receipt.width > 1400);
     const paints = await run('setCompositePaints');
     assert.equal(paints.length, 3, 'both native scenes and their relation overlay were actually composed');
@@ -555,7 +619,7 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
     const world = await context('backend');
     for (const format of ['svg', 'png']) {
       await run(`ArchifyDiagramSet.exportCurrent(${JSON.stringify(format)})`);
-      await run(`setWait(()=>document.getElementById('set-status').textContent.endsWith(${JSON.stringify(format)}))`);
+      await runAsync(`setWait(()=>document.getElementById('set-status').textContent.endsWith(${JSON.stringify(format)}))`);
       assert.equal(await run("document.documentElement.getAttribute('data-last-export-format')", world), format);
       assert.equal(await run("document.querySelector('[data-node-id=\"gateway\"]').hasAttribute('data-canvas-hidden')", world), true);
       if (format === 'svg') assert.ok(await run(`(()=>{
@@ -582,6 +646,124 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
     if (process.env.ARCHIFY_DIAGRAM_SET_EVIDENCE) fs.writeFileSync(
       path.join(process.env.ARCHIFY_DIAGRAM_SET_EVIDENCE, 'benchmark.json'), JSON.stringify(report, null, 2));
   });
+  await t.test('named directed chains expose exact hops and preserve facts through refolding', async () => {
+    await load('traced');
+    const ids = ['rel-login', 'verify-session', 'rel-auth-orders'];
+    assert.deepEqual((await run("ArchifyDiagramSet.trace('login-path')")).relation_ids, ids);
+    await stable();
+    assert.equal(await run("document.querySelectorAll('[data-trace-step]').length"), 3);
+    assert.equal((await run('ArchifyDiagramSet.state()')).scenes, 1, 'selecting a coarse trace does not eagerly mount children');
+    await run('ArchifyDiagramSet.traceStep(1)');
+    await stable('auth');
+    const world = await context('auth');
+    assert.deepEqual(await run("Array.from(document.querySelectorAll('[data-node-id][data-canvas-traced]')).map(n=>n.dataset.nodeId).sort()", world),
+      ['session', 'verifier']);
+    assert.equal(await run("document.querySelector('[data-edge-id=\"verified_session\"]').hasAttribute('data-canvas-traced')", world), true);
+    await run('ArchifyDiagramSet.traceStep(2)');
+    await stable('backend');
+    assert.equal((await run('ArchifyDiagramSet.state()')).selected, ids[2]);
+    await run("ArchifyDiagramSet.collapse('backend')");
+    await stable();
+    assert.deepEqual((await run('ArchifyDiagramSet.state()')).trace.relation_ids, ids);
+    assert.equal((await run('ArchifyDiagramSet.state()')).scenes, 1);
+    await evidence('canvas-12-chain-refold');
+    const found = await run("ArchifyDiagramSet.traceBetween({diagram:'system',node:'frontend'},{diagram:'backend',node:'orders'},{kind:'claims'})");
+    assert.equal(found.status, 'no-path');
+    assert.match(await run("document.getElementById('chain-status').textContent"), /No confirmed directed path/);
+    assert.equal((await run('ArchifyDiagramSet.state()')).trace, null);
+  });
+  await t.test('share links restore chain hops, filters and the exact shared camera and reject malformed state', async () => {
+    await load('traced');
+    await run("ArchifyDiagramSet.trace('login-path');ArchifyDiagramSet.traceStep(1)");
+    await stable('auth');
+    await run("ArchifyDiagramSet.pan(31,-19)");
+    const before = await run('ArchifyDiagramSet.state()'), link = await run('ArchifyDiagramSet.shareLink()');
+    assert.equal(link.requiresHtmlFile, true);
+    assert.match(link.note, /HTML file/);
+    const hash = new URL(link.href).hash;
+    await load('traced', hash);
+    let restored = await run('ArchifyDiagramSet.state()');
+    assert.deepEqual(restored.camera, before.camera);
+    assert.deepEqual(restored.opened, before.opened);
+    assert.deepEqual(restored.trace.relation_ids, before.trace.relation_ids);
+    assert.equal(restored.trace.step, 1);
+    await run("document.getElementById('relation-kind').value='http';document.getElementById('relation-kind').dispatchEvent(new Event('change'))");
+    await stable('auth');
+    const filtered = await run('ArchifyDiagramSet.shareLink()');
+    await load('traced', new URL(filtered.href).hash);
+    restored = await run('ArchifyDiagramSet.state()');
+    assert.equal(restored.filters.kind, 'http');
+    assert.equal(restored.trace, null);
+    for (const invalid of ['#path=system&camera=1,,2', '#path=system&hop=1']) {
+      await load('traced');
+      await run(`location.hash=${JSON.stringify(invalid)}`);
+      await runAsync("setWait(()=>document.getElementById('set-status').getAttribute('data-error')==='true')");
+      assert.deepEqual((await run('ArchifyDiagramSet.state()')).path, ['system']);
+    }
+  });
+  await t.test('code evidence states are explicit in the inspector and search/fullscreen are keyboard accessible', async () => {
+    for (const [name, expected] of [['traced', 'current'], ['stale', 'stale'], ['unverified', 'unverified']]) {
+      await load(name);
+      await run("ArchifyDiagramSet.select('rel-login');document.getElementById('relations-toggle').click()");
+      await stable();
+      assert.equal(await run("document.querySelector('[data-relation-id=\"rel-login\"]').closest('article').querySelector('[data-evidence-status]').dataset.evidenceStatus"), expected);
+      assert.equal(await run("JSON.parse(document.getElementById('diagram-set-data').textContent).evidence['rel-login'].status"), expected);
+    }
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'f', code: 'KeyF', modifiers: 2 });
+    assert.equal(await run('document.activeElement.id'), 'global-search');
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+    assert.equal(await run("document.getElementById('relations-panel').hidden"), true);
+    assert.equal(await run('document.activeElement.id'), 'stage');
+    const result = await send('Runtime.evaluate', { expression: 'ArchifyDiagramSet.fullscreen()', contextId: mainContextId, userGesture: true, awaitPromise: true });
+    assert.equal(result.exceptionDetails, undefined);
+    assert.equal(await run('!!document.fullscreenElement'), true);
+    await runAsync('ArchifyDiagramSet.fullscreen()');
+    assert.equal(await run('!!document.fullscreenElement'), false);
+  });
+  await t.test('offscreen scenes suspend watching without losing geometry, iframe identity or native focus', async () => {
+    await load('traced');
+    await expand('system', 'backend', 'backend');
+    await run("document.querySelector('[data-node-ref=\"backend:orders\"]').click()");
+    await stable('backend');
+    const original = await run('ArchifyDiagramSet.state()'), world = await context('backend');
+    const selection = original.view.selection;
+    assert.ok(selection);
+    await run('ArchifyDiagramSet.pan(100000,100000)');
+    await stable('backend');
+    const offscreen = await run('ArchifyDiagramSet.state()');
+    assert.equal(offscreen.activeScenes, 0);
+    assert.equal(offscreen.scenes, original.scenes);
+    assert.equal(await run("document.querySelectorAll('[data-node-ref]').length"), 0);
+    assert.deepEqual(offscreen.worldGeometry, original.worldGeometry);
+    await run('ArchifyDiagramSet.pan(-100000,-100000)');
+    await stable('backend');
+    assert.equal(await context('backend'), world);
+    assert.deepEqual((await run('ArchifyDiagramSet.state()')).view.selection, selection);
+    await assertNodeTargets('backend');
+    const quality = await run('ArchifyDiagramSet.visualCheck()');
+    assert.equal(quality.status, 'checked');
+    assert.equal(quality.scope, 'visible-host-overlay');
+    assert.ok(quality.checks.contrastRatio >= 3);
+    assert.ok(quality.performance.routeCache <= 256);
+    assert.equal(quality.diagnostics.some(d => d.code.endsWith('label-overlap')), false);
+  });
+  await t.test('clean current exports remove canvas trace and entrance badges without altering the mounted document', async () => {
+    await load('traced');
+    await run("ArchifyDiagramSet.trace('login-path')");
+    await stable();
+    const world = await context('system');
+    const badges = await run("document.querySelectorAll('[data-drilldown-badge]').length", world);
+    assert.ok(badges > 0);
+    await run("ArchifyDiagramSet.exportCurrent('svg')");
+    await runAsync("setWait(()=>document.getElementById('set-status').textContent.endsWith('svg'))");
+    const exported = await run("document.documentElement.getAttribute('data-test-export-svg')", world);
+    assert.ok(exported);
+    assert.equal(exported.includes('data-canvas-traced='), false);
+    assert.equal(exported.includes('data-drilldown-badge'), false);
+    assert.equal(await run("document.querySelectorAll('[data-drilldown-badge]').length", world), badges);
+    assert.ok(await run("document.querySelectorAll('[data-canvas-traced]').length", world));
+    await stable();
+  });
   await t.test('source-bound credentials reject forged messages and revoke an unexpectedly navigated frame', async () => {
     await load(); await expand('system', 'backend', 'backend');
     const before = await run('ArchifyDiagramSet.state()');
@@ -597,7 +779,7 @@ test('Offline infinite canvas expands diagrams in place and unfolds directed fac
     }
     const world = await context('backend');
     await run('location.reload()', world);
-    await run("setWait(()=>document.getElementById('set-status').getAttribute('data-error')==='true')");
+    await runAsync("setWait(()=>document.getElementById('set-status').getAttribute('data-error')==='true')");
     assert.match(await run("document.getElementById('set-status').textContent"), /Unexpected diagram navigation/);
     await run(`dispatchEvent(new MessageEvent('message',{source:document.querySelector('iframe[data-diagram="backend"]').contentWindow,
       data:{channel:'archify-diagram-set',diagram:'backend',token:null,type:'READY',payload:{}}}))`);

@@ -8,6 +8,44 @@ export const adapters = Object.freeze({
 
 export const nodeKey = (ref) => `${ref.diagram}:${ref.node}`;
 
+export function relationChain(index, ids) {
+  if (!Array.isArray(ids) || !ids.length || ids.length > 32 || new Set(ids).size !== ids.length) {
+    throw new Error('A relation chain needs 1-32 distinct canonical relation IDs.');
+  }
+  const relations = ids.map((id) => {
+    const relation = index.relations.get(id);
+    if (!relation) throw new Error(`Unknown chain relation: ${id}`);
+    return relation;
+  });
+  for (let i = 1; i < relations.length; i += 1) {
+    if (nodeKey(relations[i - 1].to) !== nodeKey(relations[i].from)) {
+      throw new Error(`Chain hops ${ids[i - 1]} and ${ids[i]} do not join at the same canonical NodeRef.`);
+    }
+  }
+  return { relation_ids: [...ids], from: { ...relations[0].from }, to: { ...relations.at(-1).to } };
+}
+
+export function findRelationPath(index, from, to, { kind = '', protocol = '', scope = '', maxHops = 32 } = {}) {
+  for (const ref of [from, to]) {
+    if (!ref || !index.nodes.get(ref.diagram)?.has(ref.node)) throw new Error('Trace endpoints must be existing canonical NodeRefs.');
+  }
+  if (!Number.isInteger(maxHops) || maxHops < 1 || maxHops > 32) throw new Error('Trace maxHops must be 1-32.');
+  if (nodeKey(from) === nodeKey(to)) return { status: 'same-node', relation_ids: [], from: { ...from }, to: { ...to } };
+  const queue = [{ ref: from, ids: [] }], visited = new Set([nodeKey(from)]);
+  for (let head = 0; head < queue.length; head += 1) {
+    const current = queue[head];
+    if (current.ids.length >= maxHops) continue;
+    for (const id of [...(index.outgoing.get(nodeKey(current.ref)) || [])].sort()) {
+      const relation = index.relations.get(id);
+      if ((kind && kind !== relation.kind) || (protocol && protocol !== relation.protocol) || (scope && scope !== relation.scope)) continue;
+      const ids = [...current.ids, id], key = nodeKey(relation.to);
+      if (key === nodeKey(to)) return { status: 'found', ...relationChain(index, ids) };
+      if (!visited.has(key)) { visited.add(key); queue.push({ ref: relation.to, ids }); }
+    }
+  }
+  return { status: 'no-path', relation_ids: [], from: { ...from }, to: { ...to }, maxHops };
+}
+
 function directSelfAt(relation, diagram) {
   return relation.from.diagram === diagram && nodeKey(relation.from) === nodeKey(relation.to);
 }

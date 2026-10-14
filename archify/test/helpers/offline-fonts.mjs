@@ -46,7 +46,19 @@ export function inspectDocuments(html, subject = 'artifact') {
     const attrs = Object.fromEntries((node.attrs || []).map(({ name, value }) => [name, value]));
     const text = (node.childNodes || []).filter((child) => child.nodeName === '#text').map((child) => child.value).join('');
     if (node.tagName === 'style') { document.styles.push(text); cssResources(text); }
-    if (node.tagName === 'script') document.scripts.push(text);
+    if (node.tagName === 'script' && attrs.type !== 'application/json') document.scripts.push(text);
+    if (node.tagName === 'script' && attrs.id === 'diagram-set-data' && attrs.type === 'application/json') {
+      const data = JSON.parse(text);
+      for (const [id, parts] of Object.entries(data.rendered)) {
+        const native = typeof parts === 'string' ? parts : parts.map((part) => {
+          if (typeof part === 'string') return part;
+          assert.ok(Number.isInteger(part) && part >= 0 && typeof data.runtime?.[part] === 'string',
+            `${subject}/diagram[${id}]: invalid shared resource reference`);
+          return data.runtime[part];
+        }).join('');
+        document.children.push(...inspectDocuments(native, `${subject}/diagram[${id}]`));
+      }
+    }
     if (attrs.style) cssResources(attrs.style);
     for (const name of ['src', 'poster', 'data']) if (remote(attrs[name])) document.resources.push(attrs[name]);
     if (attrs.srcset) for (const match of attrs.srcset.matchAll(/(?:^|[\s,])((?:https?:)?\/\/[^\s,]+)/g)) document.resources.push(match[1]);

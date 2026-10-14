@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Manifest validation and native compilation",
+    "output": "engine.html"
+  },
+  "components": [
+    {
+      "id": "bundle",
+      "label": "bundleDiagramSet",
+      "type": "backend",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "validate",
+      "label": "compileDiagramSet",
+      "type": "backend",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "loader",
+      "label": "loadDiagramSet",
+      "type": "backend",
+      "pos": [
+        440,
+        240
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "compile",
+      "label": "compileLoadedSet",
+      "type": "backend",
+      "pos": [
+        440,
+        40
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "renderers",
+      "label": "Five native renderer types",
+      "type": "backend",
+      "pos": [
+        840,
+        40
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "label": "setDiagnostic",
+      "type": "backend",
+      "pos": [
+        840,
+        240
+      ],
+      "size": [
+        220,
+        80
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "bundle-load-edge",
+      "from": "bundle",
+      "to": "loader"
+    },
+    {
+      "id": "validate-load-edge",
+      "from": "validate",
+      "to": "loader"
+    },
+    {
+      "id": "bundle-compile-edge",
+      "from": "bundle",
+      "to": "compile"
+    },
+    {
+      "id": "validate-compile-edge",
+      "from": "validate",
+      "to": "compile"
+    },
+    {
+      "id": "native-dispatch",
+      "from": "compile",
+      "to": "renderers",
+      "label": "Dispatch by diagram.type"
+    }
+  ],
+  "boundaries": []
+}

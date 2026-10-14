@@ -1,0 +1,11 @@
+{
+  "nodes": 100,
+  "nativeEdges": 191,
+  "facts": 300,
+  "compileMs": 2209,
+  "navigationAndChecksMs": 1928,
+  "liveScenes": 3,
+  "visibleFactPaths": 31,
+  "sourceIds": 300,
+  "node": "22.23.2"
+}

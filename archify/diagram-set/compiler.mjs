@@ -11,10 +11,26 @@ import { loadDiagramSet, setDiagnostic } from './model.mjs';
 import { adapters } from './relations.mjs';
 import { openDiagramSetCache, nativeRuntimeSignature } from './cache.mjs';
 import { containedBy } from '../renderers/shared/path-semantics.mjs';
+import { verifyDiagramSetEvidence } from './provenance.mjs';
+import { hasRepositoryEvidence } from '../renderers/shared/repository-evidence.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const jsonForScript = (value) => JSON.stringify(value).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
 const MAX_BUNDLE_BYTES = 96 * 1024 * 1024;
+
+function canvasLayoutRuntime() {
+  const script = (relative) => fs.readFileSync(path.join(skillRoot, ...relative.split('/')), 'utf8')
+    .replace(/\r\n?/g, '\n').replace(/^import[\s\S]*?;\n/gm, '').replace(/^export /gm, '');
+  const geometry = ['asArray', 'isFinitePoint', 'normalizeRoutePoints', 'properSegmentIntersection',
+    'segmentIntersectsRect', 'rectsOverlap', 'roundedPath'];
+  // Keep the native pure geometry/router in their own lexical scopes.
+  return `const canvasGeometry = (() => { ${script('renderers/shared/geometry.mjs')}; return {${geometry.join(',')}}; })();
+const canvasRouter = (() => { const {${geometry.join(',')}} = canvasGeometry;
+${script('renderers/shared/route-quality.mjs')}; return {shortestOrthogonalGridRoute}; })();
+const canvasLayout = (() => { const {rectsOverlap, segmentIntersectsRect, roundedPath} = canvasGeometry;
+const {shortestOrthogonalGridRoute} = canvasRouter;
+${script('diagram-set/canvas-layout.mjs')}; return {defaultRelationSplit, routeCanvasBridge, placeCanvasCaption, checkCanvasQuality}; })();`;
+}
 
 function run(args, env) {
   const result = spawnSync(process.execPath, args, {
@@ -59,12 +75,15 @@ export function packNativeDocuments(documents) {
 }
 
 function compileLoadedSet(set, { quality, repoRoot, cache = null } = {}) {
+  const evidence = verifyDiagramSetEvidence(set.manifest, { repoRoot });
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-set-'));
   const rendered = {};
   const checks = [];
   const documents = {};
   const incremental = { ...set.incremental, nativeReused: [], nativeRendered: [],
-    cacheEnabled: !!cache, nativeCacheBypass: repoRoot || process.env.ARCHIFY_REPO_ROOT ? 'repository-evidence-revalidation' : null };
+    cacheEnabled: !!cache, nativeCacheBypass: (repoRoot || process.env.ARCHIFY_REPO_ROOT)
+      && set.manifest.diagrams.some((diagram) => hasRepositoryEvidence(diagram.type, set.documents.get(diagram.id)))
+      ? 'repository-evidence-revalidation' : null };
   const runtime = cache ? nativeRuntimeSignature() : null;
   try {
     const bridge = fs.readFileSync(path.join(skillRoot, 'assets', 'diagram-bridge.js'), 'utf8');
@@ -118,14 +137,16 @@ function compileLoadedSet(set, { quality, repoRoot, cache = null } = {}) {
     const manifest = { ...set.manifest, diagrams: set.manifest.diagrams.map((diagram) => ({
       ...diagram, title: diagram.title || set.documents.get(diagram.id).meta.title,
     })) };
-    const data = { manifest, documents, ...packNativeDocuments(rendered), projections: set.projections };
+    const data = { manifest, documents, ...packNativeDocuments(rendered), projections: set.projections, evidence: evidence.verification };
     const relationsSource = fs.readFileSync(path.join(skillRoot, 'diagram-set', 'relations.mjs'), 'utf8').replace(/^export /gm, '');
     const template = fs.readFileSync(path.join(skillRoot, 'assets', 'diagram-set.html'), 'utf8');
     const html = template.replace('/* ARCHIFY:SET_DATA */', () => jsonForScript(data))
-      .replace('/* ARCHIFY:SET_RELATIONS */', () => relationsSource);
+      .replace('/* ARCHIFY:SET_RELATIONS */', () => relationsSource)
+      .replace('/* ARCHIFY:SET_LAYOUT */', () => canvasLayoutRuntime());
     if (Buffer.byteLength(html) > MAX_BUNDLE_BYTES) throwDiagnosticError('Diagram Set output exceeds 96 MiB.',
       [setDiagnostic('size-limit', 'Bundle is too large.', { input: set.input }, { bytes: Buffer.byteLength(html) }, ['split the diagram set'])]);
-    return { ...set, html, checks, incremental };
+    return { ...set, html, checks, incremental, evidence: evidence.verification, evidenceSourcePaths: evidence.sourcePaths,
+      diagnostics: [...set.diagnostics, ...evidence.diagnostics] };
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
   }
@@ -146,6 +167,7 @@ export function bundleDiagramSet(manifestPath, requestedOutput, options = {}) {
         ['choose an HTML output outside the cache directory'])]);
   }
   const compiled = compileLoadedSet(loaded, { ...options, cache });
+  outputGuard.inputPaths.push(...compiled.evidenceSourcePaths);
   writeStandaloneHtml(outputPath, compiled.html, { outputGuard });
   return { ...compiled, outputPath, artifact: {
     path: outputPath, bytes: Buffer.byteLength(compiled.html),

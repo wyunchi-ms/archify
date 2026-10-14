@@ -5,7 +5,8 @@ import { validateSchema } from '../renderers/shared/validator.mjs';
 import { validatePortablePath } from '../renderers/shared/portable-path.mjs';
 import { validateCrossCollectionContracts } from '../renderers/shared/cli.mjs';
 import { throwDiagnosticError } from '../renderers/shared/diagnostics.mjs';
-import { adapters, createRelationIndex, navigationPath, nodeKey, representativeAt, resolveProjections, supportsProjection } from './relations.mjs';
+import { adapters, createRelationIndex, navigationPath, nodeKey, relationChain, representativeAt, resolveProjections, supportsProjection } from './relations.mjs';
+import { parseRepositoryRemote } from '../renderers/shared/repository-location.mjs';
 
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const MAX_SET_BYTES = 32 * 1024 * 1024;
@@ -108,6 +109,14 @@ export function loadDiagramSet(manifestPath, { cache = null } = {}) {
   const index = createRelationIndex(manifest, documents);
   const problem = (code, message, subject, evidence, fix) =>
     diagnostics.push(setDiagnostic(code, message, subject, evidence, [fix]));
+  if (manifest.repository_url) {
+    const location = parseRepositoryRemote(manifest.repository_url, { authored: true });
+    if (!location?.provider || location.protocol !== 'https:' || location.endpoint !== 'standard'
+      || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(location.path)) {
+      problem('repository-url', 'Evidence links require a canonical, credential-free GitHub/Gitee HTTPS repository URL.',
+        { path: '/repository_url' }, {}, 'use https://github.com/owner/repository or https://gitee.com/owner/repository');
+    }
+  }
   const checkRef = (ref, subject) => {
     if (!index.nodes.get(ref.diagram)?.has(ref.node)) {
       problem('node-reference', 'NodeRef does not name an existing semantic node.', subject, ref, 'reference an existing diagram ID and semantic node ID');
@@ -174,12 +183,33 @@ export function loadDiagramSet(manifestPath, { cache = null } = {}) {
     const subject = { relation: relation.id, path: `/relations/${position}` };
     if (relationIds.has(relation.id)) problem('duplicate-id', 'Relation IDs must be unique.', subject, {}, 'rename or remove the duplicate fact');
     relationIds.add(relation.id);
+    for (const [sourcePosition, source] of (relation.evidence.sources || []).entries()) {
+      try {
+        validatePortablePath(source.path, { profile: 'archive' });
+        if (source.path.split('/').some((part) => part.toLowerCase() === '.git')) throw new Error('Git administration paths are not code evidence.');
+        if (source.endLine && source.endLine < source.line) throw new Error('Evidence endLine must not precede line.');
+      } catch (error) {
+        problem('evidence-source', error.message, { ...subject, path: `${subject.path}/evidence/sources/${sourcePosition}` },
+          {}, 'use a portable repository-relative code path and an ordered line range');
+      }
+    }
     checkRef(relation.from, subject);
     checkRef(relation.to, subject);
     if ([relation.from, relation.to].some((ref) => !adapters[index.diagrams.get(ref.diagram)?.type]?.projection
       && !index.semanticMappings.has(`${ref.diagram}:${relation.id}`))) {
       problem('unsupported-semantics', 'Non-Architecture endpoints require an explicit, typed native-edge correspondence.', subject, relation,
         'declare semantic_mappings for each non-Architecture endpoint, with an authored edge ID and an explanation; otherwise keep navigation-only');
+    }
+    const chainIds = new Set();
+    for (const [position, chain] of (manifest.chains || []).entries()) {
+      if (chainIds.has(chain.id)) problem('duplicate-chain', 'Chain IDs must be unique.', { path: `/chains/${position}` }, {},
+        'give each named chain a distinct ID');
+      chainIds.add(chain.id);
+      try { relationChain(index, chain.relation_ids); }
+      catch (error) {
+        problem('relation-chain', error.message, { path: `/chains/${position}`, chain: chain.id }, {},
+          'list existing directed facts in order, joining each hop at the exact same canonical NodeRef; do not join folded owners');
+      }
     }
   }
   const projectionIds = new Set();

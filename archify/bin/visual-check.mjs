@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -1358,6 +1359,7 @@ class PipeCdp {
     this.writtenBytes = 0;
     this.pending = new Map();
     this.waiters = [];
+    this.events = new EventEmitter();
     this.writePipe = child.stdio[3];
     this.readPipe = child.stdio[4];
     this.readPipe.setEncoding('utf8');
@@ -1420,6 +1422,9 @@ class PipeCdp {
         clearTimeout(waiter.timer);
         this.waiters.splice(this.waiters.indexOf(waiter), 1);
         waiter.resolve(message.params || {});
+      }
+      if (typeof message.method === 'string') {
+        this.events.emit(message.method, message.params || {}, message.sessionId);
       }
     }
   }

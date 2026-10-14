@@ -35,6 +35,7 @@ export function commandDiagramSet(command, args) {
       diagrams: result.manifest.diagrams.length, relations: result.index.relations.size,
       projections: result.projections, diagnostics: result.diagnostics, checks: result.checks,
       incremental: result.incremental,
+      evidence: result.evidence, chains: result.manifest.chains || [],
       sources: result.sources.map((source) => ({ path: source.path, sha256: source.sha256, bytes: source.bytes.length })),
       ...(result.artifact ? { artifact: result.artifact } : {}),
       offline: true, visualReview: 'not-requested',

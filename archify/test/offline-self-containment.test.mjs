@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertFontCss, assertOfflineArtifact, inspectDocuments } from './helpers/offline-fonts.mjs';
+import { packNativeDocuments } from '../diagram-set/compiler.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(skillRoot, '..');
@@ -47,6 +48,20 @@ test('each compare srcdoc must carry its own font and reject external resources'
     assert.throws(() => assertOfflineArtifact(frame(template) + frame(template + resource), 'compare'), /external subresource/);
   }
   assertOfflineArtifact(template + '<!-- https://github.com/JetBrains/JetBrainsMono --><a href="https://github.com/JetBrains/JetBrainsMono">Source</a>', 'attribution');
+});
+
+test('pooled Diagram Sets check every reconstructed viewer and reject malformed or external resources', () => {
+  const artifact = documents => `<script id="diagram-set-data" type="application/json">${JSON.stringify(packNativeDocuments(documents)).replaceAll('<', '\\u003c')}</script>`;
+  assert.equal(assertOfflineArtifact(artifact({ root: template, child: template }), 'pooled'), 2);
+  assert.throws(() => assertOfflineArtifact(artifact({
+    root: template, child: template.replace(/@font-face\s*\{[^}]+\}/g, ''),
+  }), 'pooled'), /diagram\[child\]/);
+  assert.throws(() => assertOfflineArtifact(artifact({
+    root: template, child: template + '<img src="https://images.example/external.png">',
+  }), 'pooled'), /external subresource/);
+  assert.throws(() => assertOfflineArtifact(
+    '<script id="diagram-set-data" type="application/json">{"runtime":[],"rendered":{"root":[0]}}</script>',
+    'pooled'), /invalid shared resource reference/);
 });
 
 test('a freshly delivered artifact of every type reaches no external origin', () => {

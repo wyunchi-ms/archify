@@ -94,13 +94,28 @@ For Diagram Sets this explicit bundle path replaces the single-diagram
 warnings and distinguish compilation from browser/perceptual review.
 Use `--cache-dir <private-directory>` for repeated compilation when requested;
 report reused/rerendered diagrams from `incremental`, not assumed speedups.
-Repository-evidence validation bypasses native cache reuse.
+For code-backed canonical facts, record `evidence.sources` with a portable
+repository-relative path, exact line range and full-file SHA-256. Pin a full Git
+commit only when its blob matches; pass `--repo-root` to both commands for source
+checks. Legacy citation strings remain unverified. Report current/stale/
+unverified states; snapshot freshness does not prove the relation's semantics.
+Canonical sources are rechecked on every compile; native IR repository evidence
+bypasses native cache reuse. Do not add transitive A-to-C facts for an A-to-B-to-C
+path. Optional named `chains` must join exact canonical endpoints in direction.
+Use the [three authoring recipes](references/diagram-set-recipes.md) for code
+repositories, adding one child, or completing a parent edge with N known facts.
 The packaged `examples/diagram-set/canvas.json` demonstrates in-place expansion
 on one pannable canvas: open one endpoint for one-to-many, then both endpoints
 for many-to-many; folding preserves the same four HTTPS fact IDs.
 `examples/diagram-set/set.json`, `examples/diagram-set/many-relations.json`
 and `examples/diagram-set/cross-type.json` show three-layer, larger-bundle and
 explicit five-type authoring shapes, not facts about the user's system.
+`examples/diagram-set/repository/set.json` traces Archify's actual CLI/compiler
+dispatch with snapshots and named chains. Its portable HTML is unverified without
+the checkout; the separate receipt records the source audit at generation.
+Share state through `ArchifyDiagramSet.shareLink()` and include the HTML file for
+local recipients. Host quality diagnostics cover visible overlays only, not
+browser/perceptual acceptance or the entire offscreen world.
 
 ## Delivery
 

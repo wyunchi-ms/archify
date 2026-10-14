@@ -27,7 +27,7 @@ the previous HTML remains intact. Output paths cannot alias an input.
 
 The JSON receipt includes `diagnostics[]`, per-diagram `checks`, source hashes,
 resolved `projections`, and (for bundle) the final artifact path, SHA-256 and byte
-count. A successful bundle proves compilation and native artifact checks, not
+count, canonical source `evidence` states and named chain data. A successful bundle proves compilation and native artifact checks, not
 browser or perceptual review. The set commands do not issue single-diagram
 delivery provenance or a `finalize` receipt. Use them for set delivery, not the
 single-SVG `check`/`finalize` commands on the outer Host HTML.
@@ -55,9 +55,10 @@ Without this flag, compilation checks and renders every diagram.
 Receipts expose `incremental.reused` / `recomputed` for per-diagram projections,
 `nativeReused` / `nativeRendered`, `cacheEnabled` and `nativeCacheBypass`.
 Renderer, schema, template, quality-profile and Node changes invalidate native
-entries. `--repo-root` or `ARCHIFY_REPO_ROOT` bypasses native reuse to revalidate
-repository evidence; a cached render never proves that external code stayed
-unchanged.
+entries. Canonical `evidence.sources` are checked on every compilation, even on
+cache hits. `--repo-root` or `ARCHIFY_REPO_ROOT` additionally bypasses native reuse
+when a native IR declares repository evidence. Authored native diagrams may
+still be reused; neither cache proves that external code stayed unchanged.
 
 Use a new or empty directory owned by the current user, not a shared or untrusted
 cache. Non-empty unmanaged directories are refused. Entries are authenticated
@@ -104,12 +105,80 @@ physical sources and symlink escapes are rejected. Input limits are 32 diagrams,
 1,000 semantic nodes per diagram, 5,000 canonical relations, 4 MiB per JSON file,
 10,000 typed correspondences, 32 MiB total JSON and 96 MiB generated HTML.
 
-`evidence.mode` is `authored`, `assumption` or `verified-source`.
-`verified-source` requires non-empty `references` (such as a pinned commit and
-file/line citation). These citations remain author-supplied provenance; the set
-validator checks their structure, not the underlying repository claim. Native
-repository evidence still uses the existing `--repo-root` verification contract.
-Expose assumptions as assumptions. Missing detail is not verified evidence.
+### Code snapshots and drift
+
+`evidence.mode` is `authored`, `assumption` or `verified-source`. The last requires
+non-empty legacy `references` or structured `sources`. Legacy strings remain
+valid but are **unverified**, not proof that code was inspected.
+
+```json
+{
+  "mode": "verified-source",
+  "sources": [{
+    "path": "src/router.mjs",
+    "line": 12,
+    "endLine": 18,
+    "sha256": "<64 lowercase hexadecimal characters>",
+    "commit": "<optional full 40-character lowercase Git commit>"
+  }]
+}
+```
+
+Hash the complete file's exact bytes, including line endings. Paths are portable
+relative paths under `--repo-root`, not under the manifest directory. With that
+root, `validate-set` and `bundle` check regular-file bindings, SHA-256 and line
+ranges. A pin additionally checks the actual commit blob. Optional manifest
+`repository_url` accepts canonical credential-free GitHub/Gitee HTTPS
+owner/repository URLs; the checkout origin must identify that repository. Pinned
+evidence requires the Git top-level, not a nested directory. Source links use
+the actual full commit and range. There are no remote requests.
+
+| Evidence state | Claim |
+| --- | --- |
+| `current` | Working bytes/range match the snapshot, and any pinned blob matches. |
+| `stale` | Working file changed, disappeared or no longer contains the range; review the mapping. |
+| `unverified` | No repository root was supplied, or only legacy citation strings exist. |
+| `authored` / `assumption` | The explicitly declared source of the fact; never upgraded to code verification. |
+
+Stale and unverified states produce visible warnings and remain publishable;
+invalid paths, repository identities or pinned blobs fail without replacing
+last-good HTML. The receipt/Viewer expose individual source states and links,
+not source contents or absolute repository paths. Limits are 512 working files,
+512 pinned blobs, 4 MiB per file and 32 MiB combined bytes. Symlink directories,
+symlink files and hard-linked files are refused. Bundle cannot overwrite cited
+code inputs. Rebundle after source changes: an offline HTML records its
+**compile-time** result and cannot monitor an inaccessible checkout.
+
+Matching bytes proves snapshot freshness, not the author's interpretation of
+a call or dependency. Inspect the actual behavior before declaring the fact;
+there is no AST inference or automatic semantic proof. Native IR repository
+evidence retains its separate existing contract.
+
+The [real repository fixture](../examples/diagram-set/repository/README.md)
+models Archify's public command dispatch and five typed renderer branches. Its
+separate audit receipt records the local source check; portable `output.html`
+deliberately reports unverified sources when reproduced without the checkout.
+Use the [three authoring recipes](diagram-set-recipes.md) for repository analysis,
+incremental detail and completing a parent edge without guessing unknown facts.
+
+### Directed multi-hop chains
+
+Optional `chains` name ordered paths, not new facts:
+
+```json
+{
+  "id": "login",
+  "title": "Verify a login and call Orders",
+  "relation_ids": ["login-to-verifier", "verify-to-session", "session-to-orders"]
+}
+```
+
+Every hop must be an existing canonical relation; adjacent exact NodeRefs must
+join in the declared direction. Folded owners are not a substitute for this
+join. Each chain has 1-32 distinct relation IDs; at most 128 named chains are
+allowed. Cycles may revisit nodes but cannot repeat an edge. The bounded path
+finder uses canonical directed facts, supports kind/protocol/scope and hop
+filters, and reports no path instead of manufacturing a transitive A-to-C edge.
 
 ## Parent projections and boundary ports
 
@@ -248,6 +317,56 @@ contracts and deliberately leaves unrelated native edges unresolved.
   and fact overlays but no inspector or controls. A composition is refused
   while the view is moving or changes during capture. Editable combined SVG
   remains unsupported.
+
+### Trace, sharing, quality and keyboard APIs
+
+Named chains appear inside the optional inspector, with ordered hop buttons,
+endpoint hierarchy and evidence state. Selecting a chain highlights its actual
+facts at the current level; stepping opens both endpoint paths while retaining
+other open branches. Collapse refolds the same IDs. Filters or an individual
+selection clear the active chain rather than showing contradictory highlights.
+
+`ArchifyDiagramSet` exposes `trace(chainId|relationIds)`, `traceStep(index)`,
+`traceBetween(from,to,{maxHops,kind,protocol,scope})`, `shareLink()`,
+`visualCheck()` and `fullscreen()`, in addition to navigation/export APIs.
+`shareLink()` includes the full open forest, focused path, relation, trace/hop,
+filters and exact shared camera. Its `requiresHtmlFile` and `note` explicitly
+warn that a `file://` recipient also needs the HTML file. Browser history stores
+camera state; malformed state returns to root with a visible warning.
+Ctrl/Meta+F opens and focuses global search; Escape closes it; Alt+Enter toggles
+fullscreen when supported. Fullscreen failures are explicit, not successful
+fallbacks. Node, relationship, bundle and hop targets have keyboard actions and
+text alternatives; English and Chinese labels are supported.
+
+### Viewport work and measurable quality
+
+Absent explicit `initial_relation_mode`, a configured `bundle_threshold` splits
+groups below the threshold and bundles those at/above it. Omitted threshold
+retains bundled behavior. Explicit mode and per-group user choices take priority.
+Host bridges reuse native orthogonal obstacle routing, rounded corners and
+caption placement. Captions avoid cards, previously placed labels and viewport
+edges; if no free corridor exists, the inspector retains the complete text.
+Native unchanged routes remain authored rather than being replaced.
+
+The Host caches at most 256 normalized routes, culls offscreen paths and
+virtualizes offscreen node hit targets. Open offscreen iframes suspend geometry
+watching and rely on browser viewport paint culling, retaining context, native
+focus and geometry for re-entry. The Host does not toggle live-frame visibility:
+that can stall Chromium teardown after inspecting an offscreen frame.
+This is **not** iframe execution-memory sharing or disposal; collapse disposes
+descendants, and the manifest still caps live scenes at 32. Each settled draw
+paints up to 256 visible canonical groups, prioritizing the selected trace;
+deferred groups remain in the complete inspector with an explicit warning.
+The projection/view cache stays bounded to 64 entries.
+
+`visualCheck()` covers the **visible Host overlay**, not an unseen entire world.
+It returns `status: "pending"|"checked"`, `ok`, machine-readable diagnostics,
+counts, non-text contrast ratio and route/culling/active-scene metrics.
+Checks flag obstructed nodes, overlapping captions, routing-budget fallback,
+contrast below 3:1 and deferred group budgets. Warnings are progressively
+disclosed inside Relations and suggest repairs or list-based inspection.
+Native artifact validation is performed separately by the compiler; neither
+check replaces browser/perceptual review or guarantees a frame rate.
 
 The Host and child communicate over source-bound, per-instance token-checked
 messages; opaque `file://` origins alone are never trusted. Child Viewers are

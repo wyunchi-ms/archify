@@ -182,7 +182,7 @@ test('late owner work before the last comparison rejects at 960 instead of false
   assert.equal(result.frame, 960);
 });
 
-// Exercise the actual unchanged PipeCdp implementation and CLI inspection with
+// Exercise the actual PipeCdp implementation and unchanged CLI timeout with
 // a fake transport/clock. No Chrome process and no real 15-second sleep needed.
 // Frame and wall-clock limits are independent: the CLI can time out before960.
 test('forever-pending joint inspection still fails at the unchanged 15000ms CDP boundary without fallback', async () => {
@@ -193,6 +193,7 @@ test('forever-pending joint inspection still fails at the unchanged 15000ms CDP 
   let now = 0;
   const clockContext = vm.createContext({
     Buffer,
+    EventEmitter,
     process,
     setTimeout(callback, delay) { const id = ++nextTimer; timers.set(id, { callback, deadline: now + delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
@@ -229,6 +230,8 @@ test('forever-pending joint inspection still fails at the unchanged 15000ms CDP 
   const browser = Object.create(ChromeVisualBrowser.prototype);
   browser.sessionPromise = Promise.resolve('test-session');
   browser.cdp = new PipeCdp(child);
+  const notifiedSessions = [];
+  browser.cdp.events.on('Page.loadEventFired', (params, sessionId) => notifiedSessions.push(sessionId));
   let settled = false;
   const outcome = browser.inspect({ artifactPath: '/tmp/forever-pending.html', width: 1440, height: 900, theme: 'light' })
     .then(value => { settled = true; return { value }; }, error => { settled = true; return { error }; });
@@ -252,6 +255,7 @@ test('forever-pending joint inspection still fails at the unchanged 15000ms CDP 
   assert.equal(timers.size, 0);
   assert.deepEqual(localCalls, [], 'CDP failure cannot trigger a legacy recovery path');
   assert.equal(sent.filter(message => message.method === 'Runtime.evaluate').length, 1, 'no metrics evaluation after timeout');
+  assert.deepEqual(notifiedSessions, ['test-session'], 'event subscribers and one-shot waiters both receive the original session');
 });
 
 function inspection({ capability = true, rejectJoint = false, localMethods = true } = {}) {

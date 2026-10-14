@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Archify Diagram Set delivery",
+    "output": "root.html"
+  },
+  "components": [
+    {
+      "id": "cli",
+      "label": "CLI commands",
+      "type": "frontend",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "engine",
+      "label": "Diagram Set engine",
+      "type": "backend",
+      "pos": [
+        440,
+        40
+      ],
+      "size": [
+        220,
+        80
+      ]
+    },
+    {
+      "id": "artifact",
+      "label": "Standalone HTML",
+      "type": "external",
+      "pos": [
+        840,
+        40
+      ],
+      "size": [
+        220,
+        80
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "dispatch",
+      "from": "cli",
+      "to": "engine",
+      "label": "Command dispatch"
+    },
+    {
+      "id": "publication",
+      "from": "engine",
+      "to": "artifact",
+      "label": "Atomic publication"
+    }
+  ],
+  "boundaries": []
+}

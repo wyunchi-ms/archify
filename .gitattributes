@@ -2,6 +2,7 @@
 # Keep source templates and the hand-authored landing page visible to Linguist.
 /archify/examples/*.html linguist-generated=true
 /archify/examples/diagram-set/*.html linguist-generated=true
+/archify/examples/diagram-set/repository/*.html linguist-generated=true
 /examples/*.html linguist-generated=true
 /examples/diagram-set/*.html linguist-generated=true
 /docs/cases/*.html linguist-generated=true

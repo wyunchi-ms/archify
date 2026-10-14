@@ -11,6 +11,15 @@ const bundles = new Map();
 const pending = new Map();
 const nodeTargets = new Map();
 const cameraBefore = new Map();
+const routeCache = new Map();
+let trace = null;
+let canvasNodes = [];
+let canvasRoutes = [];
+let canvasLabels = [];
+let paintLimit = 32;
+let culledGroups = 0;
+let deferredGroups = 0;
+let qualitySignature = '';
 const maxCameraScale = 100000;
 let path = [manifest.root_diagram];
 let kind = '';
@@ -23,6 +32,7 @@ let revision = 0;
 let camera = { scale: 1, x: 0, y: 0 };
 let baseScale = 1;
 let initialFit = true;
+let initialSharedCamera = null;
 let cameraMotion = null;
 let pendingFocus = null;
 let visiblePoints = new Map();
@@ -46,6 +56,11 @@ const words = {
     unresolved: 'Detail unknown', partial: 'Incomplete detail', resolved: 'Mapped',
     badPath: 'Invalid canvas hierarchy; returned to the root.',
     unexpectedNavigation: 'Unexpected diagram navigation. Reload this HTML to restore the canvas.',
+    chains: 'Trace a directed chain', chooseChain: 'Choose a chain', clearChain: 'Clear trace',
+    noPath: 'No confirmed directed path connects these endpoints.', quality: 'Canvas quality',
+    current: 'Snapshot current', stale: 'Source changed: review mapping', unverified: 'Source not verified',
+    authored: 'Authored fact', assumption: 'Explicit assumption', sourceBuild: 'Checked at build time, not continuously.',
+    zoomIn: 'Zoom in', zoomOut: 'Zoom out', closeRelations: 'Close relationships', canvas: 'Architecture canvas',
   },
   'zh-CN': {
     relations: '关系', kind: '类型', protocol: '协议', scope: '范围', direction: '方向',
@@ -59,6 +74,11 @@ const words = {
     unresolved: '细节未知', partial: '细节不完整', resolved: '已映射',
     badPath: '无效的画布层级，已返回主图。',
     unexpectedNavigation: '图页面发生了意外跳转。请重新加载 HTML 恢复画布。',
+    chains: '追踪有向链路', chooseChain: '选择链路', clearChain: '清除追踪',
+    noPath: '这些端点之间没有已确认的有向路径。', quality: '画布质量',
+    current: '来源快照一致', stale: '来源已变化：请复核映射', unverified: '来源未验证',
+    authored: '作者声明的事实', assumption: '明确假设', sourceBuild: '仅在构建时校验，不会持续检查代码。',
+    zoomIn: '放大', zoomOut: '缩小', closeRelations: '关闭关系面板', canvas: '架构画布',
   },
 };
 const text = words[manifest.locale || 'en'];
@@ -69,8 +89,12 @@ for (const [id, key] of Object.entries({
   'relations-toggle': 'relations', 'relations-heading': 'relations', 'kind-label': 'kind',
   'protocol-label': 'protocol', 'scope-label': 'scope', 'direction-label': 'direction',
   'search-label': 'search', 'filters-label': 'filters', fit: 'fit', 'canvas-hint': 'hint',
+  'chains-label': 'chains', 'chain-select-label': 'chooseChain', 'quality-label': 'quality',
 })) byId(id).textContent = text[key];
 byId('global-search').placeholder = text.search;
+for (const [id, key] of Object.entries({ 'zoom-in': 'zoomIn', 'zoom-out': 'zoomOut', 'relations-close': 'closeRelations', stage: 'canvas' })) {
+  byId(id).setAttribute('aria-label', text[key]);
+}
 function status(message, error = false) {
   byId('set-status').textContent = message;
   byId('set-status').hidden = !error;
@@ -253,9 +277,13 @@ function focusScene(id, animate = true) {
 function saveLocation() {
   history.replaceState({ path: [...path], opened: [...opened], camera: { ...camera } }, '', location.href);
 }
-function locationUpdate(push = true) {
+function locationUpdate(push = true, includeCamera = false) {
   const params = new URLSearchParams({ path: path.join('/') });
   if (opened.size) params.set('open', [...opened].sort().join(','));
+  if (selected) params.set('relation', selected);
+  if (trace) { params.set('trace', trace.relation_ids.join(',')); params.set('hop', String(trace.step)); }
+  for (const [key, value] of Object.entries(filters())) if (value) params.set(key, value);
+  if (includeCamera) params.set('camera', [camera.scale, camera.x, camera.y].join(','));
   const hash = `#${params}`;
   const state = { path: [...path], opened: [...opened], camera: { ...camera } };
   if (push) history.pushState(state, '', hash);
@@ -323,9 +351,32 @@ function restoreLocation() {
     const owner = index.parents.get(id);
     return owner && (owner.diagram === manifest.root_diagram || open.has(owner.diagram));
   }) && candidate.slice(1).every((id) => open.has(id));
-  if (!valid || location.hash.length > 8192) {
+  const allowed = new Set(['path', 'open', 'relation', 'trace', 'hop', 'kind', 'protocol', 'scope', 'direction', 'camera']);
+  let restoredTrace = null;
+  if (params.has('trace')) {
+    try {
+      restoredTrace = relationChain(index, params.get('trace').split(','));
+      restoredTrace.step = Number(params.get('hop') || 0);
+      if (!Number.isInteger(restoredTrace.step) || restoredTrace.step < 0 || restoredTrace.step >= restoredTrace.relation_ids.length) restoredTrace = null;
+    } catch { /* Invalid authored URL state is reported below, never used as facts. */ }
+  }
+  const cameraSegments = params.has('camera') ? params.get('camera').split(',') : null;
+  const sharedCamera = cameraSegments?.every((value) => value.trim()) ? cameraSegments.map(Number) : null;
+  const restoredCamera = sharedCamera?.length === 3 ? { scale: sharedCamera[0], x: sharedCamera[1], y: sharedCamera[2] } : null;
+  const relation = params.get('relation');
+  const validFilters = ['kind', 'protocol', 'scope'].every((key) => !params.get(key)
+    || [...index.relations.values()].some((entry) => entry[key] === params.get(key)))
+    && ['', 'incoming', 'outgoing', 'internal'].includes(params.get('direction') || '');
+  if (!valid || location.hash.length > 32768 || [...params.keys()].some((key) => !allowed.has(key))
+    || (relation && !index.relations.has(relation)) || (params.has('trace') && !restoredTrace)
+    || (params.has('hop') && !restoredTrace) || (restoredTrace && relation && relation !== restoredTrace.relation_ids[restoredTrace.step])
+    || !validFilters || (params.has('camera') && !validCamera(restoredCamera))) {
+    trace = null; selected = null; kind = ''; extraFilters = { protocol: '', scope: '', direction: '' };
     navigate([manifest.root_diagram], false); status(text.badPath, true); return;
   }
+  trace = restoredTrace; selected = relation || trace?.relation_ids[trace.step] || null;
+  kind = params.get('kind') || '';
+  extraFilters = Object.fromEntries(['protocol', 'scope', 'direction'].map((key) => [key, params.get(key) || '']));
   beginMorph();
   for (const id of [...opened]) if (!open.has(id)) removeScene(id);
   opened.clear();
@@ -333,7 +384,8 @@ function restoreLocation() {
   ensureScene(manifest.root_diagram);
   path = candidate;
   pendingFocus = null;
-  if (validCamera(history.state?.camera)) moveCamera(history.state.camera);
+  if (restoredCamera) { initialSharedCamera = restoredCamera; moveCamera(restoredCamera); }
+  else if (validCamera(history.state?.camera)) { initialSharedCamera = history.state.camera; moveCamera(history.state.camera); }
   else pendingFocus = { id: candidate.at(-1), animate: false };
   revision += 1;
   updateChrome(); renderRelations(); scheduleDraw(); status('', false);
@@ -370,16 +422,18 @@ function panel(open) {
   if (open) renderRelations();
 }
 function splitGroup(group) {
-  return bundles.has(group.key) ? bundles.get(group.key) : manifest.viewer?.initial_relation_mode === 'expanded';
+  return bundles.has(group.key) ? bundles.get(group.key) : canvasLayout.defaultRelationSplit(group, manifest.viewer);
 }
 function toggleGroup(group) {
   beginMorph(); bundles.set(group.key, !splitGroup(group));
   revision += 1; renderRelations(); scheduleDraw();
 }
-function chooseRelation(id) {
+function highlightedIds() { return new Set(trace?.relation_ids || (selected ? [selected] : [])); }
+function chooseRelation(id, keepTrace = false) {
   const relation = index.relations.get(id);
   if (!relation) { status(`Unknown relation: ${id}`, true); return; }
   beginMorph();
+  if (!keepTrace) trace = null;
   selected = id;
   if (kind && kind !== relation.kind) kind = '';
   if (extraFilters.protocol && extraFilters.protocol !== relation.protocol) extraFilters.protocol = '';
@@ -396,9 +450,62 @@ function chooseRelation(id) {
   }
   const group = groups().find((entry) => entry.sourceRelationIds.includes(id));
   selectedBucket = group ? bucketKey(group) : null;
-  updateChrome(); renderRelations(); scheduleDraw();
+  locationUpdate(false); updateChrome(); renderRelations(); scheduleDraw();
+}
+function setTrace(value) {
+  const chain = typeof value === 'string' ? (manifest.chains || []).find((entry) => entry.id === value) : null;
+  const ids = Array.isArray(value) ? value : chain?.relation_ids;
+  trace = { ...relationChain(index, ids), step: 0, ...(chain ? { id: chain.id } : {}) };
+  kind = ''; extraFilters = { protocol: '', scope: '', direction: '' };
+  chooseRelation(trace.relation_ids[0], true);
+  byId('chain-controls').open = true;
+  panel(true);
+  return structuredClone(trace);
+}
+function traceStep(step) {
+  if (!trace || !Number.isInteger(step) || step < 0 || step >= trace.relation_ids.length) throw new Error('Invalid trace hop.');
+  trace.step = step;
+  const relation = index.relations.get(trace.relation_ids[step]);
+  const paths = [relation.from, relation.to].map((ref) => navigationPath(index, ref.diagram));
+  for (const next of paths.filter((entry) => entry.length > 1)) navigate(next);
+  chooseRelation(relation.id, true);
+}
+function renderTrace() {
+  byId('chain-controls').hidden = !trace && !(manifest.chains || []).length;
+  const select = byId('chain-select');
+  select.replaceChildren(new Option(text.chooseChain, ''));
+  for (const chain of manifest.chains || []) select.add(new Option(chain.title, chain.id));
+  select.value = trace?.id || '';
+  const steps = byId('chain-steps'); steps.replaceChildren();
+  if (!trace) { byId('chain-status').textContent = ''; return; }
+  byId('chain-controls').open = true;
+  trace.relation_ids.forEach((id, i) => {
+    const relation = index.relations.get(id), step = document.createElement('li');
+    const action = button(`${hierarchyLabel(relation.from)} → ${hierarchyLabel(relation.to)}`, () => traceStep(i));
+    action.dataset.traceStep = String(i); action.dataset.traceRelation = id;
+    action.setAttribute('aria-current', String(trace.step === i));
+    const detail = document.createElement('small');
+    detail.textContent = `${id} · ${relation.kind}${relation.protocol ? ` / ${relation.protocol}` : ''} · ${text[data.evidence[id]?.status || relation.evidence.mode]}`;
+    step.append(action, detail); steps.appendChild(step);
+  });
+  const clear = button(text.clearChain, () => { trace = null; selected = null; locationUpdate(false); renderRelations(); scheduleDraw(); });
+  const clearRow = document.createElement('li'); clearRow.className = 'trace-clear'; clearRow.appendChild(clear); steps.appendChild(clearRow);
+  byId('chain-status').textContent = `${trace.step + 1} / ${trace.relation_ids.length}`;
+}
+function renderQuality() {
+  const quality = visualCheck(), warnings = byId('quality-list');
+  const signature = JSON.stringify(quality.diagnostics);
+  if (signature === qualitySignature) return;
+  qualitySignature = signature;
+  warnings.replaceChildren();
+  byId('canvas-quality').hidden = !quality.diagnostics.length;
+  for (const diagnostic of quality.diagnostics) {
+    const warning = document.createElement('p'); warning.textContent = `${diagnostic.message} ${diagnostic.supportedFixes.join('; ')}`;
+    warning.dataset.qualityCode = diagnostic.code; warnings.appendChild(warning);
+  }
 }
 function renderRelations() {
+  renderTrace(); renderQuality();
   const list = byId('relation-list');
   const previous = new Map([...list.querySelectorAll('.relation-tree')].map((tree) => [tree.dataset.bucket, tree.open]));
   list.replaceChildren();
@@ -433,7 +540,7 @@ function renderRelations() {
         const relation = index.relations.get(id);
         const row = document.createElement('article'); row.className = 'relation-row';
         const item = button('', () => chooseRelation(id)); item.className = 'relation-select';
-        item.dataset.relationId = id; item.setAttribute('aria-pressed', String(selected === id));
+        item.dataset.relationId = id; item.setAttribute('aria-pressed', String(highlightedIds().has(id)));
         const label = document.createElement('strong'); label.textContent = relation.label || relation.kind;
         const endpoints = document.createElement('small');
         endpoints.textContent = `${hierarchyLabel(relation.from)} → ${hierarchyLabel(relation.to)}`;
@@ -443,6 +550,24 @@ function renderRelations() {
         const evidence = document.createElement('p');
         evidence.textContent = `${id} · ${text.source}: ${relation.evidence.mode}${relation.evidence.references ? ` · ${relation.evidence.references.join(', ')}` : ''}`;
         detail.append(detailTitle, evidence);
+        const verified = data.evidence[id];
+        const state = document.createElement('p');
+        state.dataset.evidenceStatus = verified?.status || relation.evidence.mode;
+        state.textContent = `${text[verified?.status || relation.evidence.mode]} · ${text.sourceBuild}`;
+        detail.appendChild(state);
+        for (const source of verified?.sources || []) {
+          const line = document.createElement('p');
+          const label = `${source.path}:${source.line}${source.endLine ? `-${source.endLine}` : ''}`;
+          if (source.href) {
+            const link = document.createElement('a');
+            const url = new URL(source.href);
+            if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Unsafe evidence link.');
+            link.href = source.href; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = label;
+            line.appendChild(link);
+          } else line.textContent = label;
+          line.appendChild(document.createTextNode(` · ${text[source.status]}${source.commit ? ` · ${source.commit.slice(0, 12)}` : ''}`));
+          detail.appendChild(line);
+        }
         for (const projection of data.projections.filter((entry) => entry.derived_from.includes(id))) {
           detail.appendChild(button(`${index.diagrams.get(projection.diagram).title} / ${projection.relation_id} · ${text[projection.status]}`, () => {
             navigate(navigationPath(index, projection.diagram));
@@ -481,6 +606,8 @@ function nativeEdge(group) {
 }
 function layoutScenes() {
   const ordered = [...scenes.values()].sort((a, b) => navigationPath(index, a.id).length - navigationPath(index, b.id).length);
+  const highlighted = highlightedIds();
+  const tracedGroups = highlighted.size ? groups().filter((group) => group.sourceRelationIds.some((id) => highlighted.has(id))) : [];
   for (const scene of ordered) {
     if (!scene.bounds) {
       scene.frame.style.transform = `translate(${(20 - camera.x) / camera.scale}px,${(80 - camera.y) / camera.scale}px) scale(${1 / camera.scale})`;
@@ -508,7 +635,70 @@ function layoutScenes() {
       scene.visibility = visibility;
       post(scene, 'CANVAS_VISIBILITY', { nodes: hiddenNodes, edges: hiddenEdges });
     }
+    const tracedNodes = new Set(), tracedEdges = new Set();
+    for (const id of highlighted) {
+      const fact = index.relations.get(id);
+      for (const endpoint of [fact.from, fact.to]) {
+        const ref = canvasRepresentative(index, endpoint, opened);
+        if (ref.diagram === scene.id) tracedNodes.add(ref.node);
+      }
+    }
+    for (const group of tracedGroups) {
+      const edge = nativeEdge(group);
+      if (edge && group.from.diagram === scene.id) tracedEdges.add(edge.id);
+    }
+    const traced = JSON.stringify([[...tracedNodes], [...tracedEdges]]);
+    if (scene.ready && traced !== scene.traced) {
+      scene.traced = traced; post(scene, 'CANVAS_TRACE', { nodes: [...tracedNodes], edges: [...tracedEdges] });
+    }
   }
+}
+function suspendOffscreenScenes() {
+  for (const scene of scenes.values()) if (scene.ready && scene.layout && scene.bounds) {
+    const hidden = new Set([...opened].filter((id) => index.parents.get(id).diagram === scene.id)
+      .map((id) => index.parents.get(id).node));
+    const visibleNode = [...index.nodes.get(scene.id).keys()].some((node) =>
+      !hidden.has(node) && intersects(screenRect(nodeRect({ diagram: scene.id, node }))));
+    const visibleEdge = [...index.edges.get(scene.id).values()].some((edge) =>
+      !hidden.has(edge.from) && !hidden.has(edge.to) && scene.edges[edge.id]?.length
+      && routeOnscreen(scene.edges[edge.id].map((point) => screenPoint(worldPoint(scene, point)))));
+    const active = visibleNode || visibleEdge;
+    // Let the browser cull offscreen paint; hiding live iframe documents can stall teardown.
+    if (scene.active !== active) { scene.active = active; post(scene, 'ACTIVATE', { active }); }
+  }
+}
+function frontierNodes() {
+  return [...scenes.values()].flatMap((scene) => [...index.nodes.get(scene.id).keys()].flatMap((node) => {
+    const child = entrance(scene.id, node);
+    if (child && opened.has(child.to_diagram)) return [];
+    const ref = { diagram: scene.id, node }, box = nodeRect(ref);
+    return box ? [{ key: nodeKey(ref), ...screenRect(box) }] : [];
+  }));
+}
+function routeOnscreen(points, padding = 32) {
+  const xs = points.map((point) => point.x), ys = points.map((point) => point.y);
+  return intersects({ x: Math.min(...xs) - padding, y: Math.min(...ys) - padding,
+    width: Math.max(...xs) - Math.min(...xs) + padding * 2, height: Math.max(...ys) - Math.min(...ys) + padding * 2 });
+}
+function routedBridge(points, offset) {
+  const [a, b] = points.map(screenPoint);
+  const round = (value) => Math.round(value * 1000) / 1000;
+  const obstacles = canvasNodes.filter((node) => {
+    const margin = 180 + Math.abs(offset);
+    return node.x <= Math.max(a.x, b.x) + margin && node.x + node.width >= Math.min(a.x, b.x) - margin
+      && node.y <= Math.max(a.y, b.y) + margin && node.y + node.height >= Math.min(a.y, b.y) - margin;
+  }).map((node) => ({ x: round(node.x - a.x), y: round(node.y - a.y), width: round(node.width), height: round(node.height) }));
+  const request = { start: [0, 0], end: [round(b.x - a.x), round(b.y - a.y)], fromSide: points[0].side,
+    toSide: points[1].side, obstacles, offset };
+  const key = JSON.stringify(request);
+  let route = routeCache.get(key);
+  if (!route) {
+    route = canvasLayout.routeCanvasBridge(request);
+    if (routeCache.size >= 256) routeCache.delete(routeCache.keys().next().value);
+    routeCache.set(key, route);
+  }
+  const mapped = route.points.map(([x, y]) => [x + a.x, y + a.y]);
+  return { ...route, points: mapped, path: canvasGeometry.roundedPath(mapped, 7) };
 }
 function routePoints(group) {
   const fromBox = nodeRect(group.from), toBox = nodeRect(group.to);
@@ -560,10 +750,16 @@ function inspectGroup(group) {
   if (group.count === 1) chooseRelation(group.sourceRelationIds[0]);
   panel(true); renderRelations();
 }
-function caption(point, label, attrs = {}) {
+function caption(point, label, attrs = {}, route = null, ids = []) {
   const screen = screenPoint(point);
-  svg.appendChild(el('text', { x: screen.x, y: screen.y - 8, 'text-anchor': 'middle',
-    class: 'bridge-caption', ...attrs }, label));
+  const element = el('text', { x: 0, y: 0, 'text-anchor': 'middle', class: 'bridge-caption', ...attrs }, label);
+  svg.appendChild(element);
+  const measured = element.getBBox();
+  const placed = canvasLayout.placeCanvasCaption(route || [[screen.x, screen.y]], measured.width, measured.height,
+    canvasNodes, canvasLabels, { x: 0, y: 0, width: stage.clientWidth, height: stage.clientHeight });
+  if (!placed || !intersects(placed)) { element.remove(); return; }
+  element.setAttribute('x', placed.x - measured.x); element.setAttribute('y', placed.y - measured.y);
+  canvasLabels.push({ ...placed, ids });
 }
 function drawGroup(group) {
   const points = routePoints(group);
@@ -575,21 +771,33 @@ function drawGroup(group) {
     const pair = mapped?.length ? [mapped[0], mapped.at(-1)] : points;
     group.sourceRelationIds.forEach((id) => visiblePoints.set(id, pair));
     const screenRoute = mapped?.map(screenPoint);
+    if (!routeOnscreen(screenRoute || points.map(screenPoint))) { culledGroups += 1; return; }
     const d = screenRoute?.map((point, i) => `${i ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ') || curve(points);
     hitPath(d, `${labelRef(group.from)} → ${labelRef(group.to)} · ${group.count}`, () => inspectGroup(group));
     return;
   }
   const ids = group.sourceRelationIds;
-  const rows = splitGroup(group) ? ids.map((id) => [id]) : selected && ids.includes(selected) && ids.length > 1
-    ? [ids.filter((id) => id !== selected), [selected]] : [ids];
+  const highlighted = highlightedIds();
+  const preferred = ids.filter((id) => highlighted.has(id));
+  const separated = splitGroup(group) ? [...preferred, ...ids.filter((id) => !highlighted.has(id)).slice(0, Math.max(0, paintLimit - preferred.length))]
+    : preferred;
+  const remainder = ids.filter((id) => !separated.includes(id));
+  const rows = [...(remainder.length ? [remainder] : []), ...separated.map((id) => [id])];
+  if (!routeOnscreen(points.map(screenPoint), 320)) { culledGroups += 1; return; }
   rows.forEach((sourceIds, row) => {
     const animated = animatedPoints(points, sourceIds);
-    let d = curve(animated, (row - (rows.length - 1) / 2) * 16);
+    let route = routedBridge(animated, (row - (rows.length - 1) / 2) * 16);
     if (nodeKey(group.from) === nodeKey(group.to)) {
       const box = screenRect(nodeRect(group.from)), a = screenPoint(animated[0]), b = screenPoint(animated[1]);
-      d = `M ${a.x} ${a.y} C ${box.x + box.width + 40} ${box.y - 45}, ${box.x - 40} ${box.y - 45}, ${b.x} ${b.y}`;
+      const loop = [[a.x, a.y], [box.x + box.width + 24, a.y], [box.x + box.width + 24, box.y - 24],
+        [box.x - 24, box.y - 24], [box.x - 24, b.y], [b.x, b.y]];
+      route = { points: loop, path: canvasGeometry.roundedPath(loop, 7), status: 'routed' };
     }
-    svg.appendChild(el('path', { d, class: `bridge-line${sourceIds.includes(selected) ? ' is-selected' : ''}`,
+    if (!routeOnscreen(route.points.map(([x, y]) => ({ x, y })))) return;
+    canvasRoutes.push({ ...route, ids: sourceIds, endpoints: [nodeKey(group.from), nodeKey(group.to)] });
+    const stale = sourceIds.some((id) => data.evidence[id]?.status === 'stale');
+    const d = route.path;
+    svg.appendChild(el('path', { d, class: `bridge-line${sourceIds.some((id) => highlighted.has(id)) ? ' is-selected' : ''}${stale ? ' is-stale' : ''}`,
       'marker-end': 'url(#set-arrow)', 'data-source-relations': sourceIds.join(' '),
       'data-from': nodeKey(group.from), 'data-to': nodeKey(group.to) }));
     hitPath(d, `${labelRef(group.from)} → ${labelRef(group.to)} · ${sourceIds.length}`, () => {
@@ -600,7 +808,8 @@ function drawGroup(group) {
     const midpoint = { x: (animated[0].x + animated[1].x) / 2, y: (animated[0].y + animated[1].y) / 2 };
     if (sourceIds.length > 1 || sourceIds.includes(selected)) {
       caption({ ...midpoint, y: midpoint.y + row * 16 / camera.scale },
-        sourceIds.length > 1 ? `${group.protocol || group.kind} ×${sourceIds.length}` : index.relations.get(sourceIds[0]).label || group.kind);
+        sourceIds.length > 1 ? `${group.protocol || group.kind} ×${sourceIds.length}` : index.relations.get(sourceIds[0]).label || group.kind,
+        {}, route.points, sourceIds);
     }
   });
 }
@@ -614,16 +823,20 @@ function drawProjections(projected) {
     });
     const points = routePoints({ from, to, kind: '' });
     if (!points) continue;
+    if (!routeOnscreen(points.map(screenPoint), 320)) continue;
     if (!replaced) {
       const visible = projection.derived_from.filter((id) => ids.has(id)).length;
       const total = projection.derived_from.length;
       if (total) caption({ x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 + 18 / camera.scale },
         `×${visible}${visible !== total ? ` / ${total}` : ''}`, { 'data-projection-id': projection.relation_id });
     } else if (projection.status !== 'resolved') {
-      const d = curve(points);
+      const route = routedBridge(points, 0), d = route.path;
+      if (!routeOnscreen(route.points.map(([x, y]) => ({ x, y })))) continue;
+      canvasRoutes.push({ ...route, ids: projection.derived_from, endpoints: [nodeKey(from), nodeKey(to)] });
       svg.appendChild(el('path', { d, class: 'bridge-line is-unresolved', 'marker-end': 'url(#set-arrow)',
         'data-unresolved-projection': `${projection.diagram}:${projection.relation_id}` }));
-      caption({ x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 }, text[projection.status]);
+      caption({ x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 },
+        text[projection.status], {}, route.points, projection.derived_from);
     }
   }
 }
@@ -637,6 +850,7 @@ function drawTargets() {
       const box = nodeRect({ diagram: scene.id, node });
       if (!box) continue;
       const key = `${scene.id}:${node}`, screen = screenRect(box);
+      if (!intersects(screen)) continue;
       used.add(key);
       let target = nodeTargets.get(key);
       if (!target) {
@@ -686,7 +900,7 @@ function draw() {
   if (initialFit) {
     const next = fitted({ x: 0, y: 0, ...root.bounds });
     baseScale = next.scale;
-    camera = next; initialFit = false;
+    camera = initialSharedCamera || next; initialSharedCamera = null; initialFit = false;
   }
   const ready = [...scenes.values()].every((scene) => scene.ready && scene.layout && scene.bounds);
   if (ready && pendingFocus) {
@@ -698,12 +912,14 @@ function draw() {
     if (t === 1 || reducedMotion.matches) { camera = cameraMotion.to; cameraMotion = null; }
   }
   byId('world').style.transform = `translate(${camera.x}px,${camera.y}px) scale(${camera.scale})`;
+  suspendOffscreenScenes();
   byId('zoom-level').textContent = `${Math.round(camera.scale * 100)}%`;
   drawTargets();
   if (!ready) { if (cameraMotion) scheduleDraw(); return; }
   if (morphSeed && reducedMotion.matches) morphSeed = null;
   if (morphSeed && morphStart === null) morphStart = performance.now();
   visiblePoints = new Map();
+  canvasNodes = frontierNodes(); canvasRoutes = []; canvasLabels = []; culledGroups = 0; deferredGroups = 0;
   svg.replaceChildren();
   svg.setAttribute('viewBox', `0 0 ${stage.clientWidth} ${stage.clientHeight}`);
   const defs = el('defs'), marker = el('marker', { id: 'set-arrow', viewBox: '0 0 10 10',
@@ -711,13 +927,40 @@ function draw() {
   marker.appendChild(el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: 'var(--set-accent)' }));
   defs.appendChild(marker); svg.appendChild(defs);
   const projected = groups();
-  for (const group of projected) drawGroup(group);
+  paintLimit = Math.max(1, Math.floor(256 / Math.max(1, projected.length)) - 1);
+  const highlighted = highlightedIds();
+  let painted = 0;
+  for (const group of [...projected].sort((a, b) =>
+    Number(b.sourceRelationIds.some((id) => highlighted.has(id))) - Number(a.sourceRelationIds.some((id) => highlighted.has(id))))) {
+    if (painted >= 256) { deferredGroups += 1; continue; }
+    const before = svg.childElementCount;
+    drawGroup(group);
+    if (svg.childElementCount !== before) painted += 1;
+  }
   drawProjections(projected);
   const morphing = !!morphSeed && performance.now() - morphStart < 220;
   document.documentElement.toggleAttribute('data-edge-morph', morphing);
   if (!morphing) { morphSeed = null; morphStart = null; }
   document.documentElement.setAttribute('data-canvas-ready', 'true');
+  if (!cameraMotion && !morphing && !byId('relations-panel').hidden) renderQuality();
   if (cameraMotion || morphing) scheduleDraw();
+}
+function visualCheck() {
+  const computed = getComputedStyle(document.documentElement);
+  const result = canvasLayout.checkCanvasQuality({ routes: canvasRoutes, labels: canvasLabels, nodes: canvasNodes,
+    foreground: computed.getPropertyValue('--set-accent').trim(), background: computed.getPropertyValue('--set-bg').trim(), opacity: .75 });
+  if (deferredGroups) {
+    result.ok = false;
+    result.diagnostics.push({ code: 'diagram-set/canvas-visible-group-budget', severity: 'warning',
+      message: `${deferredGroups} additional groups remain available in Relations.`, subject: {},
+      evidence: { deferredGroups, maximumPaintedGroups: 256 },
+      supportedFixes: ['filter or bundle relationships; use the complete relationship inspector for the remaining facts'] });
+  }
+  const settled = !cameraMotion && !morphSeed && [...scenes.values()].every((scene) => scene.ready && scene.bounds && scene.layout);
+  return { ...result, ok: result.ok && settled, status: settled ? 'checked' : 'pending',
+    scope: 'visible-host-overlay', nativeArtifacts: 'checked-by-compiler',
+    performance: { routeCache: routeCache.size, culledGroups,
+      activeScenes: [...scenes.values()].filter((scene) => scene.active).length } };
 }
 function validState(state, id) {
   const view = state?.viewport;
@@ -744,6 +987,9 @@ addEventListener('message', (event) => {
       post(scene, 'ACTIVATE', { active: true });
       for (const command of scene.commands.splice(0)) post(scene, command.type, command.payload);
       scheduleDraw(); break;
+    case 'VIEW_STATE':
+      if (validState(payload, scene.id)) scene.state = payload;
+      break;
     case 'GEOMETRY_CHANGED':
       if (!payload.nodes || Object.keys(payload.nodes).length > 1000
         || !Object.entries(payload.nodes).every(([node, rect]) => index.nodes.get(scene.id).has(node)
@@ -836,12 +1082,16 @@ byId('zoom-out').addEventListener('click', () => zoom(.8));
 byId('fit').addEventListener('click', fit);
 byId('relations-toggle').addEventListener('click', () => panel(byId('relations-panel').hidden));
 byId('relations-close').addEventListener('click', () => { panel(false); byId('relations-toggle').focus(); });
+byId('chain-select').addEventListener('change', (event) => {
+  if (event.target.value) setTrace(event.target.value);
+  else { trace = null; selected = null; locationUpdate(false); renderRelations(); scheduleDraw(); }
+});
 for (const key of ['kind', 'protocol', 'scope', 'direction']) byId(`relation-${key}`).addEventListener('change', (event) => {
   beginMorph();
   if (key === 'kind') kind = event.target.value;
   else extraFilters[key] = event.target.value;
   if (selected && !groups().some((group) => group.sourceRelationIds.includes(selected))) selected = null;
-  revision += 1; renderRelations(); scheduleDraw();
+  trace = null; locationUpdate(false); revision += 1; renderRelations(); scheduleDraw();
 });
 byId('global-search').addEventListener('input', (event) => {
   const query = event.target.value.trim().toLowerCase(), results = byId('search-results');
@@ -864,7 +1114,16 @@ byId('global-search').addEventListener('input', (event) => {
   }
 });
 addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+    event.preventDefault(); panel(true); byId('global-search').focus(); return;
+  }
+  if (event.key === 'Escape' && event.target === byId('global-search')) {
+    event.preventDefault(); panel(false); stage.focus(); return;
+  }
   if (event.target.closest('input,textarea,select,[contenteditable="true"]')) return;
+  if (event.altKey && event.key === 'Enter') {
+    event.preventDefault(); fullscreen().catch((error) => status(error.message, true)); return;
+  }
   if (event.key === 'Escape') {
     if (!byId('relations-panel').hidden) { panel(false); byId('relations-toggle').focus(); }
     else collapse();
@@ -877,6 +1136,11 @@ addEventListener('keydown', (event) => {
       event.key === 'ArrowUp' ? 80 : event.key === 'ArrowDown' ? -80 : 0);
   }
 });
+async function fullscreen() {
+  if (document.fullscreenElement) return document.exitFullscreen();
+  if (!document.fullscreenEnabled) throw new Error('Canvas fullscreen is unavailable in this browser.');
+  return document.documentElement.requestFullscreen();
+}
 function snapshot(scene) {
   return new Promise((resolve, reject) => {
     if (!scene?.ready) return reject(new Error('Diagram is not ready.'));
@@ -960,6 +1224,7 @@ addEventListener('popstate', restoreLocation);
 restoreLocation();
 window.ArchifyDiagramSet = {
   state: () => structuredClone({ path: [...path], opened: [...opened].sort(), camera, selected, kind, filters: filters(),
+    trace, activeScenes: [...scenes.values()].filter((scene) => scene.active).length,
     scenes: scenes.size, ready: [...scenes.values()].every((scene) => scene.ready && scene.bounds && scene.layout),
     morphing: document.documentElement.hasAttribute('data-edge-morph'), moving: !!cameraMotion,
     view: current()?.state || null, geometry: current()?.geometry || {},
@@ -967,6 +1232,22 @@ window.ArchifyDiagramSet = {
       .map((node) => [`${scene.id}:${node}`, nodeRect({ diagram: scene.id, node })]))),
     layouts: Object.fromEntries([...scenes.values()].map((scene) => [scene.id, { ...scene.layout, bounds: scene.bounds }])) }),
   navigate, expand, collapse, pan, zoom, fit, select: chooseRelation, project: groups, exportComposite: composite,
+  trace: setTrace, traceStep, visualCheck, fullscreen,
+  traceBetween: (from, to, options) => {
+    const result = findRelationPath(index, from, to, options);
+    if (result.status === 'found') setTrace(result.relation_ids);
+    else {
+      trace = null; selected = null; locationUpdate(false); panel(true);
+      byId('chain-controls').hidden = false; byId('chain-controls').open = true;
+      byId('chain-status').textContent = text.noPath; scheduleDraw();
+    }
+    return result;
+  },
+  shareLink: () => {
+    locationUpdate(false, true);
+    return { href: location.href, requiresHtmlFile: location.protocol === 'file:',
+      note: location.protocol === 'file:' ? 'The recipient also needs access to this HTML file.' : '' };
+  },
   exportCurrent: (format) => {
     if (!['svg', 'png'].includes(format) || !current()?.ready) throw new Error('Current-diagram export is unavailable.');
     post(current(), 'EXPORT', { format });

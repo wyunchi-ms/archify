@@ -4,6 +4,7 @@
   const token = config.token;
   if (typeof token !== 'string' || !/^[a-f0-9]{32}$/.test(token)) throw new Error('Diagram bridge instance is not configured.');
   let active = false;
+  let exporting = false;
   let frame = 0;
   let last = '';
   let lastRelationship = null;
@@ -24,6 +25,10 @@
       html[data-canvas="true"] [data-legend] { display:none!important; }
       html[data-canvas="true"] .diagram-container > svg > rect[width="100%"][height="100%"] { display:none!important; }
       html[data-canvas="true"] [data-canvas-hidden] { visibility:hidden!important; }
+      html[data-canvas="true"] [data-canvas-traced] { opacity:1!important; }
+      html[data-canvas="true"] [data-canvas-traced] > .c-mask { stroke:var(--text-primary); stroke-width:2.5; }
+      html[data-canvas="true"] [data-canvas-traced][data-edge-id],
+      html[data-canvas="true"] [data-canvas-traced][data-edge-id] :is(path,line,polyline) { stroke-width:2.8; }
     `;
     document.head.appendChild(style);
   }
@@ -33,7 +38,7 @@
     if (typeof url === 'string' && url.startsWith('#')) url = location.href.split('#')[0] + url;
     return replaceState(state, title, url);
   };
-  const allowed = new Set(['INIT', 'ACTIVATE', 'RESTORE_STATE', 'FOCUS_RELATION', 'FOCUS_NODE', 'EXPORT', 'SNAPSHOT', 'THEME', 'CANVAS_VISIBILITY']);
+  const allowed = new Set(['INIT', 'ACTIVATE', 'RESTORE_STATE', 'FOCUS_RELATION', 'FOCUS_NODE', 'EXPORT', 'SNAPSHOT', 'THEME', 'CANVAS_VISIBILITY', 'CANVAS_TRACE']);
   const send = (type, payload) => {
     if (token) parent.postMessage({ channel: 'archify-diagram-set', diagram: config.id, token, type, payload }, '*');
   };
@@ -134,6 +139,7 @@
   function watch() {
     frame = 0;
     if (!active) return;
+    if (exporting) { frame = requestAnimationFrame(watch); return; }
     const signature = JSON.stringify([savedState(), rect(svg), svg.getAttribute('viewBox'),
       document.documentElement.getAttribute('data-preset'), innerWidth, innerHeight,
       container.getAttribute('data-camera-transaction')]);
@@ -194,6 +200,20 @@
           break;
         case 'ACTIVATE': activate(payload.active === true); break;
         case 'CANVAS_VISIBILITY': canvasVisibility(payload); break;
+        case 'CANVAS_TRACE':
+          if (!config.canvas || !Array.isArray(payload.nodes) || !Array.isArray(payload.edges)
+            || payload.nodes.length > 1000 || payload.edges.length > 10000
+            || ![...payload.nodes, ...payload.edges].every((id) => typeof id === 'string' && id.length <= 128)) {
+            throw new Error('Invalid canvas trace.');
+          }
+          svg.querySelectorAll('[data-canvas-traced]').forEach((element) => element.removeAttribute('data-canvas-traced'));
+          for (const [name, ids] of [['data-node-id', payload.nodes], ['data-edge-id', payload.edges]]) {
+            const selected = new Set(ids);
+            svg.querySelectorAll(`[${name}]`).forEach((element) => {
+              if (selected.has(element.getAttribute(name))) element.setAttribute('data-canvas-traced', '');
+            });
+          }
+          break;
         case 'RESTORE_STATE': restore(payload.state); break;
         case 'THEME':
           if (!['dark', 'light'].includes(payload.theme)) throw new Error('Invalid set theme.');
@@ -216,12 +236,22 @@
           if (!['svg', 'png'].includes(payload.format)) throw new Error('Unsupported current-diagram format.');
           {
             const hidden = [...svg.querySelectorAll('[data-canvas-hidden]')];
+            const traced = [...svg.querySelectorAll('[data-canvas-traced]')];
+            const badges = [...svg.querySelectorAll('[data-drilldown-badge]')].map((element) =>
+              ({ element, parent: element.parentNode, next: element.nextSibling }));
+            exporting = true;
+            badges.forEach(({ element }) => element.remove());
             if (config.canvas) document.documentElement.removeAttribute('data-canvas');
             hidden.forEach((element) => element.removeAttribute('data-canvas-hidden'));
+            traced.forEach((element) => element.removeAttribute('data-canvas-traced'));
             try { await Archify.exportMenu.run(payload.format); }
             finally {
               hidden.forEach((element) => element.setAttribute('data-canvas-hidden', ''));
+              traced.forEach((element) => element.setAttribute('data-canvas-traced', ''));
+              badges.forEach(({ element, parent, next }) => parent.insertBefore(element, next));
               if (config.canvas) document.documentElement.setAttribute('data-canvas', 'true');
+              exporting = false;
+              last = '';
             }
           }
           if (document.documentElement.hasAttribute('data-last-export-error')
@@ -234,9 +264,10 @@
           const snapshot = Archify.exportMenu.snapshotSvg();
           if (config.canvas) {
             const exported = new DOMParser().parseFromString(snapshot.svgString, 'image/svg+xml');
+            exported.querySelectorAll('[data-drilldown-badge]').forEach((element) => element.remove());
             const style = exported.createElementNS('http://www.w3.org/2000/svg', 'style');
             // Standalone SVGs have no html[data-canvas] ancestor for the embedding rules.
-            style.textContent = '[data-canvas-hidden] { visibility:hidden!important; } [data-legend],svg > rect[width="100%"][height="100%"] { display:none!important; }';
+            style.textContent = '[data-canvas-hidden] { visibility:hidden!important; } [data-canvas-traced] { opacity:1!important; } [data-canvas-traced] > .c-mask { stroke:var(--text-primary); stroke-width:2.5; } [data-legend],svg > rect[width="100%"][height="100%"] { display:none!important; }';
             exported.documentElement.appendChild(style);
             snapshot.svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(exported.documentElement);
           }

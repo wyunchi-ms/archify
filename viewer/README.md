@@ -60,6 +60,17 @@ mounting a scene, then injects its private reply credential without mutating the
 pool. Script order, classic scope, stylesheet/font element IDs and native export
 introspection stay unchanged. This is offline payload sharing, not shared DOM
 or JavaScript state between opaque-origin iframes.
+`diagram-set/canvas-layout.mjs` reuses native geometry and orthogonal routing;
+the compiler inlines the same pure helpers for obstacle/caption placement and
+visible-overlay quality diagnostics. Routes are cached (256), offscreen targets
+are virtualized, and offscreen scene watching is suspended without discarding
+its execution context. Browser viewport clipping owns offscreen paint culling;
+do not hide live iframe documents, which can stall Chromium teardown.
+Deferred visible groups remain in the complete inspector.
+Named chains, hop navigation, snapshot states and source links are progressively
+disclosed there. The Host API supports tracing, exact-camera/filter share links,
+fullscreen and scoped `visualCheck`; current exports strip canvas traces/badges
+while composite snapshots retain legitimate highlights and visibility.
 See [Diagram Sets](../archify/references/diagram-sets.md) for the manifest,
 protocol boundary, export scope and supported adapter matrix.
 

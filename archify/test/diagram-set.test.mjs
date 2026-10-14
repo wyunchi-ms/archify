@@ -357,13 +357,13 @@ test('Incremental compilation reuses verified native artifacts and only affected
   assert.equal(misuse.status, 1);
   assert.equal(JSON.parse(misuse.stdout).ok, false);
   const evidence = compileDiagramSet(file, { cacheDir, repoRoot: root });
-  assert.equal(evidence.incremental.nativeCacheBypass, 'repository-evidence-revalidation');
-  assert.deepEqual(evidence.incremental.nativeReused, []);
+  assert.equal(evidence.incremental.nativeCacheBypass, null, 'a repository root alone does not turn authored native diagrams into code-evidence diagrams');
+  assert.deepEqual(evidence.incremental.nativeReused, ['system', 'backend', 'auth']);
   const envEvidence = spawnSync(process.execPath, [cli, 'validate-set', file, '--cache-dir', cacheDir, '--json'], {
     encoding: 'utf8', env: { ...process.env, ARCHIFY_REPO_ROOT: root },
   });
   assert.equal(envEvidence.status, 0, envEvidence.stderr);
-  assert.deepEqual(JSON.parse(envEvidence.stdout).incremental.nativeRendered, ['system', 'backend', 'auth']);
+  assert.deepEqual(JSON.parse(envEvidence.stdout).incremental.nativeReused, ['system', 'backend', 'auth']);
   const output = path.join(directory, 'last-good.html');
   bundleDiagramSet(file, output, { cacheDir });
   const lastGood = fs.readFileSync(output);

@@ -1,0 +1,292 @@
+{
+  "schemaVersion": 1,
+  "command": "validate-set",
+  "ok": true,
+  "set": "archify-repository-pipeline",
+  "evidence": {
+    "command-bundle": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/cli.mjs",
+          "line": 30,
+          "endLine": 30,
+          "sha256": "073930454bb3ed863d42acc0e49d9c827833197a5ffc194d0a885556f715bb30",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "073930454bb3ed863d42acc0e49d9c827833197a5ffc194d0a885556f715bb30"
+        }
+      ]
+    },
+    "command-validate": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/cli.mjs",
+          "line": 31,
+          "endLine": 31,
+          "sha256": "073930454bb3ed863d42acc0e49d9c827833197a5ffc194d0a885556f715bb30",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "073930454bb3ed863d42acc0e49d9c827833197a5ffc194d0a885556f715bb30"
+        }
+      ]
+    },
+    "command-diagnostic": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/cli.mjs",
+          "line": 51,
+          "endLine": 51,
+          "sha256": "073930454bb3ed863d42acc0e49d9c827833197a5ffc194d0a885556f715bb30",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "073930454bb3ed863d42acc0e49d9c827833197a5ffc194d0a885556f715bb30"
+        }
+      ]
+    },
+    "bundle-load": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/compiler.mjs",
+          "line": 158,
+          "endLine": 158,
+          "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+        }
+      ]
+    },
+    "validate-load": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/compiler.mjs",
+          "line": 51,
+          "endLine": 51,
+          "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+        }
+      ]
+    },
+    "bundle-compile": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/compiler.mjs",
+          "line": 169,
+          "endLine": 169,
+          "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+        }
+      ]
+    },
+    "validate-compile": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/compiler.mjs",
+          "line": 51,
+          "endLine": 51,
+          "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+        }
+      ]
+    },
+    "bundle-html": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/compiler.mjs",
+          "line": 171,
+          "endLine": 171,
+          "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+        }
+      ]
+    },
+    "render-architecture": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/compiler.mjs",
+          "line": 105,
+          "endLine": 105,
+          "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+        },
+        {
+          "path": "archify/diagram-set/relations.mjs",
+          "line": 2,
+          "endLine": 2,
+          "sha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d"
+        },
+        {
+          "path": "archify/renderers/architecture/render-architecture.mjs",
+          "line": 53,
+          "endLine": 53,
+          "sha256": "3831899e2e12cedd2e8225285fc9e50e8cd032f036fac87264b0bd5ddc60fda6",
+          "commit": "ae58b77f51f8091fbcaad72f6a6370a889202ac0",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "3831899e2e12cedd2e8225285fc9e50e8cd032f036fac87264b0bd5ddc60fda6",
+          "href": "https://github.com/wyunchi-ms/archify/blob/ae58b77f51f8091fbcaad72f6a6370a889202ac0/archify/renderers/architecture/render-architecture.mjs#L53"
+        }
+      ]
+    },
+    "render-workflow": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/compiler.mjs",
+          "line": 105,
+          "endLine": 105,
+          "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+        },
+        {
+          "path": "archify/diagram-set/relations.mjs",
+          "line": 3,
+          "endLine": 3,
+          "sha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d"
+        },
+        {
+          "path": "archify/renderers/workflow/render-workflow.mjs",
+          "line": 10,
+          "endLine": 10,
+          "sha256": "df6cb1330231616dcb83592c3cc1dbf4b3e45567779836ae031ff57d2d517b89",
+          "commit": "ae58b77f51f8091fbcaad72f6a6370a889202ac0",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "df6cb1330231616dcb83592c3cc1dbf4b3e45567779836ae031ff57d2d517b89",
+          "href": "https://github.com/wyunchi-ms/archify/blob/ae58b77f51f8091fbcaad72f6a6370a889202ac0/archify/renderers/workflow/render-workflow.mjs#L10"
+        }
+      ]
+    },
+    "render-sequence": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/compiler.mjs",
+          "line": 105,
+          "endLine": 105,
+          "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+        },
+        {
+          "path": "archify/diagram-set/relations.mjs",
+          "line": 4,
+          "endLine": 4,
+          "sha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d"
+        },
+        {
+          "path": "archify/renderers/sequence/render-sequence.mjs",
+          "line": 20,
+          "endLine": 20,
+          "sha256": "46ed05a34655fbe6c421586366aa81480bca893233d61b9391e21afc667f15a1",
+          "commit": "ae58b77f51f8091fbcaad72f6a6370a889202ac0",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "46ed05a34655fbe6c421586366aa81480bca893233d61b9391e21afc667f15a1",
+          "href": "https://github.com/wyunchi-ms/archify/blob/ae58b77f51f8091fbcaad72f6a6370a889202ac0/archify/renderers/sequence/render-sequence.mjs#L20"
+        }
+      ]
+    },
+    "render-dataflow": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/compiler.mjs",
+          "line": 105,
+          "endLine": 105,
+          "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+        },
+        {
+          "path": "archify/diagram-set/relations.mjs",
+          "line": 5,
+          "endLine": 5,
+          "sha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d"
+        },
+        {
+          "path": "archify/renderers/dataflow/render-dataflow.mjs",
+          "line": 49,
+          "endLine": 49,
+          "sha256": "a8540e7b1a4794c6da6b64707ce17e970ca5e876544fd29554d2503c196f1dde",
+          "commit": "ae58b77f51f8091fbcaad72f6a6370a889202ac0",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "a8540e7b1a4794c6da6b64707ce17e970ca5e876544fd29554d2503c196f1dde",
+          "href": "https://github.com/wyunchi-ms/archify/blob/ae58b77f51f8091fbcaad72f6a6370a889202ac0/archify/renderers/dataflow/render-dataflow.mjs#L49"
+        }
+      ]
+    },
+    "render-lifecycle": {
+      "status": "current",
+      "sources": [
+        {
+          "path": "archify/diagram-set/compiler.mjs",
+          "line": 105,
+          "endLine": 105,
+          "sha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "b876aaa3651f8dba55a7c55447d76fa0505bd3e80cd59c3ebae677c0e640654b"
+        },
+        {
+          "path": "archify/diagram-set/relations.mjs",
+          "line": 6,
+          "endLine": 6,
+          "sha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "9d768eaada8e63968bacb11dd57dc80c9f69acb01ed32b5d19b54decb972d65d"
+        },
+        {
+          "path": "archify/renderers/lifecycle/render-lifecycle.mjs",
+          "line": 44,
+          "endLine": 44,
+          "sha256": "1ed2e359a5eab6a2bd9473c36c6184498d68748e9175cddf6894aa7b2ba3f670",
+          "commit": "ae58b77f51f8091fbcaad72f6a6370a889202ac0",
+          "status": "current",
+          "reason": null,
+          "currentSha256": "1ed2e359a5eab6a2bd9473c36c6184498d68748e9175cddf6894aa7b2ba3f670",
+          "href": "https://github.com/wyunchi-ms/archify/blob/ae58b77f51f8091fbcaad72f6a6370a889202ac0/archify/renderers/lifecycle/render-lifecycle.mjs#L44"
+        }
+      ]
+    }
+  },
+  "diagnostics": [],
+  "sourceScope": "repository-at-generation"
+}

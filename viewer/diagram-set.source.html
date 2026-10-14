@@ -41,6 +41,17 @@
         <label for="relation-direction" id="direction-label"></label><select id="relation-direction"></select>
       </details>
       <div id="search-results"></div>
+      <details id="chain-controls">
+        <summary id="chains-label"></summary>
+        <label class="sr-only" for="chain-select" id="chain-select-label"></label>
+        <select id="chain-select"></select>
+        <ol id="chain-steps"></ol>
+        <p id="chain-status" role="status" aria-live="polite"></p>
+      </details>
+      <details id="canvas-quality" hidden>
+        <summary id="quality-label"></summary>
+        <div id="quality-list"></div>
+      </details>
       <div id="relation-list"></div>
     </aside>
   </main>
@@ -49,6 +60,7 @@
   (function () {
     'use strict';
 /* ARCHIFY:SET_RELATIONS */
+/* ARCHIFY:SET_LAYOUT */
 /* ARCHIFY:SET_HOST */
   })();
   </script>
